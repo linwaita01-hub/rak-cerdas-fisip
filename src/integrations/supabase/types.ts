@@ -214,6 +214,13 @@ export type Database = {
             referencedRelation: "eksemplar"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "peminjaman_user_profiles_fk"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
         ]
       }
       pengaturan_denda: {
@@ -332,6 +339,13 @@ export type Database = {
             columns: ["eksemplar_id"]
             isOneToOne: false
             referencedRelation: "eksemplar"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reservasi_user_profiles_fk"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
