@@ -12,6 +12,8 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Loader2, Plus, Printer, Trash2, Search, Check, X, RefreshCw } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { ExportBukuButton, ImportBukuButton, HistoryButton, TabSampah } from "@/components/dashboard/InventoryTools";
 import { toast } from "sonner";
 import { Barcode } from "@/components/Barcode";
 import { BarcodeScannerInput } from "@/components/BarcodeScannerInput";
@@ -25,15 +27,17 @@ import {
 export function StaffDashboard() {
   return (
     <Tabs defaultValue="transaksi" className="w-full">
-      <TabsList className="grid w-full grid-cols-4 sm:w-auto">
+      <TabsList className="grid w-full grid-cols-5 sm:w-auto">
         <TabsTrigger value="transaksi">Transaksi</TabsTrigger>
         <TabsTrigger value="inventaris">Inventaris</TabsTrigger>
         <TabsTrigger value="mahasiswa">Mahasiswa</TabsTrigger>
+        <TabsTrigger value="sampah">Sampah</TabsTrigger>
         <TabsTrigger value="pengaturan">Pengaturan</TabsTrigger>
       </TabsList>
       <TabsContent value="transaksi" className="mt-4"><TabTransaksi /></TabsContent>
       <TabsContent value="inventaris" className="mt-4"><TabInventaris /></TabsContent>
       <TabsContent value="mahasiswa" className="mt-4"><TabMahasiswa /></TabsContent>
+      <TabsContent value="sampah" className="mt-4"><TabSampah /></TabsContent>
       <TabsContent value="pengaturan" className="mt-4"><TabPengaturan /></TabsContent>
     </Tabs>
   );
