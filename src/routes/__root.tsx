@@ -12,6 +12,7 @@ import { useEffect, type ReactNode } from "react";
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { Toaster } from "@/components/ui/sonner";
+import { PwaManager } from "@/components/PwaManager";
 
 function NotFoundComponent() {
   return (
@@ -79,17 +80,34 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
       { title: "Peminjaman Buku Perpus UNLAM FISIP" },
-      { name: "description", content: "Sistem peminjaman buku Perpustakaan FISIP Universitas Lambung Mangkurat — ajukan, setujui, dan kembalikan buku dengan barcode." },
+      {
+        name: "description",
+        content:
+          "Sistem peminjaman buku Perpustakaan FISIP Universitas Lambung Mangkurat — ajukan, setujui, dan kembalikan buku dengan barcode.",
+      },
       { property: "og:title", content: "Peminjaman Buku Perpus UNLAM FISIP" },
-      { property: "og:description", content: "Sistem peminjaman buku Perpustakaan FISIP Universitas Lambung Mangkurat." },
+      {
+        property: "og:description",
+        content: "Sistem peminjaman buku Perpustakaan FISIP Universitas Lambung Mangkurat.",
+      },
       { property: "og:type", content: "website" },
       { property: "og:site_name", content: "Perpus FISIP ULM" },
       { name: "twitter:card", content: "summary" },
       { name: "theme-color", content: "#7a1f1f" },
+      { name: "mobile-web-app-capable", content: "yes" },
+      { name: "apple-mobile-web-app-capable", content: "yes" },
+      { name: "apple-mobile-web-app-status-bar-style", content: "black-translucent" },
+      { name: "apple-mobile-web-app-title", content: "Perpus FISIP ULM" },
     ],
     links: [
       { rel: "stylesheet", href: appCss },
-      { rel: "icon", type: "image/png", href: "/__l5e/assets-v1/8ff76c38-639d-4f41-9e72-97b819e82957/logo-unlam.png" },
+      { rel: "manifest", href: "/manifest.webmanifest" },
+      {
+        rel: "icon",
+        type: "image/png",
+        href: "/__l5e/assets-v1/8ff76c38-639d-4f41-9e72-97b819e82957/logo-unlam.png",
+      },
+      { rel: "apple-touch-icon", href: "/apple-touch-icon.png" },
     ],
   }),
   shellComponent: RootShell,
@@ -119,6 +137,7 @@ function RootComponent() {
     <QueryClientProvider client={queryClient}>
       <Outlet />
       <Toaster richColors position="top-center" />
+      <PwaManager />
     </QueryClientProvider>
   );
 }
