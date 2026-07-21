@@ -37,7 +37,8 @@ import {
 import { toast } from "sonner";
 import { Barcode } from "@/components/Barcode";
 import { BarcodeScannerInput } from "@/components/BarcodeScannerInput";
-import { fmtIDR, fmtWITA } from "@/hooks/useMe";
+import { fmtIDR, fmtWITA, useMe } from "@/hooks/useMe";
+import { AdminSementaraPanel } from "@/components/dashboard/AdminSementaraPanel";
 import {
   setujuiPeminjaman,
   tolakPeminjaman,
@@ -54,14 +55,17 @@ import {
 } from "@/lib/perpus.functions";
 
 export function StaffDashboard() {
+  const { role } = useMe();
+  const isSuperAdmin = role === "super_admin";
   return (
     <Tabs defaultValue="transaksi" className="w-full">
-      <TabsList className="grid w-full grid-cols-5 sm:w-auto">
+      <TabsList className={`grid w-full ${isSuperAdmin ? "grid-cols-6" : "grid-cols-5"} sm:w-auto`}>
         <TabsTrigger value="transaksi">Transaksi</TabsTrigger>
         <TabsTrigger value="inventaris">Inventaris</TabsTrigger>
         <TabsTrigger value="mahasiswa">Mahasiswa</TabsTrigger>
         <TabsTrigger value="sampah">Sampah</TabsTrigger>
         <TabsTrigger value="pengaturan">Pengaturan</TabsTrigger>
+        {isSuperAdmin && <TabsTrigger value="super">Super Admin</TabsTrigger>}
       </TabsList>
       <TabsContent value="transaksi" className="mt-4">
         <TabTransaksi />
@@ -78,6 +82,11 @@ export function StaffDashboard() {
       <TabsContent value="pengaturan" className="mt-4">
         <TabPengaturan />
       </TabsContent>
+      {isSuperAdmin && (
+        <TabsContent value="super" className="mt-4">
+          <AdminSementaraPanel />
+        </TabsContent>
+      )}
     </Tabs>
   );
 }
