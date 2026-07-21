@@ -556,6 +556,7 @@ function TabPengaturan() {
               grace_days: Number(v.grace_days),
               max_denda: v.max_denda === "" || v.max_denda == null ? null : Number(v.max_denda),
               batas_ambil_reservasi_jam: Number(v.batas_ambil_reservasi_jam),
+              purge_hari: Number(v.purge_hari ?? 60),
             }});
             toast.success("Tersimpan.");
           } catch (e) { toast.error(e instanceof Error ? e.message : "Gagal."); }
@@ -564,7 +565,9 @@ function TabPengaturan() {
           <div className="space-y-1"><Label>Grace period (hari)</Label><Input type="number" min={0} value={v.grace_days} onChange={(e) => setV({ ...v, grace_days: e.target.value })} /></div>
           <div className="space-y-1"><Label>Maksimum denda (Rp, kosongkan = tanpa batas)</Label><Input type="number" min={0} value={v.max_denda ?? ""} onChange={(e) => setV({ ...v, max_denda: e.target.value })} /></div>
           <div className="space-y-1"><Label>Batas ambil reservasi (jam)</Label><Input type="number" min={1} value={v.batas_ambil_reservasi_jam} onChange={(e) => setV({ ...v, batas_ambil_reservasi_jam: e.target.value })} /></div>
+          <div className="space-y-1"><Label>Retensi tempat sampah (hari) — auto-purge</Label><Input type="number" min={1} value={v.purge_hari ?? 60} onChange={(e) => setV({ ...v, purge_hari: e.target.value })} /></div>
           <Button type="submit">Simpan</Button>
+
         </form>
       </CardContent>
     </Card>
