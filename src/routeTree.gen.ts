@@ -13,6 +13,7 @@ import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedLengkapiProfilRouteImport } from './routes/_authenticated/lengkapi-profil'
+import { Route as AuthenticatedEditorBukuRouteImport } from './routes/_authenticated/editor-buku'
 import { Route as AuthenticatedAppRouteImport } from './routes/_authenticated/app'
 
 const AuthRoute = AuthRouteImport.update({
@@ -35,6 +36,11 @@ const AuthenticatedLengkapiProfilRoute =
     path: '/lengkapi-profil',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedEditorBukuRoute = AuthenticatedEditorBukuRouteImport.update({
+  id: '/editor-buku',
+  path: '/editor-buku',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedAppRoute = AuthenticatedAppRouteImport.update({
   id: '/app',
   path: '/app',
@@ -45,12 +51,14 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/app': typeof AuthenticatedAppRoute
+  '/editor-buku': typeof AuthenticatedEditorBukuRoute
   '/lengkapi-profil': typeof AuthenticatedLengkapiProfilRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/app': typeof AuthenticatedAppRoute
+  '/editor-buku': typeof AuthenticatedEditorBukuRoute
   '/lengkapi-profil': typeof AuthenticatedLengkapiProfilRoute
 }
 export interface FileRoutesById {
@@ -59,19 +67,21 @@ export interface FileRoutesById {
   '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
   '/auth': typeof AuthRoute
   '/_authenticated/app': typeof AuthenticatedAppRoute
+  '/_authenticated/editor-buku': typeof AuthenticatedEditorBukuRoute
   '/_authenticated/lengkapi-profil': typeof AuthenticatedLengkapiProfilRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/auth' | '/app' | '/lengkapi-profil'
+  fullPaths: '/' | '/auth' | '/app' | '/editor-buku' | '/lengkapi-profil'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/auth' | '/app' | '/lengkapi-profil'
+  to: '/' | '/auth' | '/app' | '/editor-buku' | '/lengkapi-profil'
   id:
     | '__root__'
     | '/'
     | '/_authenticated'
     | '/auth'
     | '/_authenticated/app'
+    | '/_authenticated/editor-buku'
     | '/_authenticated/lengkapi-profil'
   fileRoutesById: FileRoutesById
 }
@@ -111,6 +121,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedLengkapiProfilRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/editor-buku': {
+      id: '/_authenticated/editor-buku'
+      path: '/editor-buku'
+      fullPath: '/editor-buku'
+      preLoaderRoute: typeof AuthenticatedEditorBukuRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/app': {
       id: '/_authenticated/app'
       path: '/app'
@@ -123,11 +140,13 @@ declare module '@tanstack/react-router' {
 
 interface AuthenticatedRouteRouteChildren {
   AuthenticatedAppRoute: typeof AuthenticatedAppRoute
+  AuthenticatedEditorBukuRoute: typeof AuthenticatedEditorBukuRoute
   AuthenticatedLengkapiProfilRoute: typeof AuthenticatedLengkapiProfilRoute
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedAppRoute: AuthenticatedAppRoute,
+  AuthenticatedEditorBukuRoute: AuthenticatedEditorBukuRoute,
   AuthenticatedLengkapiProfilRoute: AuthenticatedLengkapiProfilRoute,
 }
 
@@ -142,3 +161,13 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
