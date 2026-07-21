@@ -65,6 +65,38 @@ export type Database = {
         }
         Relationships: []
       }
+      buku_history: {
+        Row: {
+          buku_id: string
+          created_at: string
+          data_lama: Json
+          diubah_oleh: string | null
+          id: string
+        }
+        Insert: {
+          buku_id: string
+          created_at?: string
+          data_lama: Json
+          diubah_oleh?: string | null
+          id?: string
+        }
+        Update: {
+          buku_id?: string
+          created_at?: string
+          data_lama?: Json
+          diubah_oleh?: string | null
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "buku_history_buku_id_fkey"
+            columns: ["buku_id"]
+            isOneToOne: false
+            referencedRelation: "buku"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       denda: {
         Row: {
           catatan: string | null
@@ -229,6 +261,7 @@ export type Database = {
           grace_days: number
           id: number
           max_denda: number | null
+          purge_hari: number
           tarif_per_hari: number
           updated_at: string
           updated_by: string | null
@@ -238,6 +271,7 @@ export type Database = {
           grace_days?: number
           id?: number
           max_denda?: number | null
+          purge_hari?: number
           tarif_per_hari?: number
           updated_at?: string
           updated_by?: string | null
@@ -247,6 +281,7 @@ export type Database = {
           grace_days?: number
           id?: number
           max_denda?: number | null
+          purge_hari?: number
           tarif_per_hari?: number
           updated_at?: string
           updated_by?: string | null
@@ -283,6 +318,30 @@ export type Database = {
           nim?: string | null
           prodi?: string | null
           updated_at?: string
+        }
+        Relationships: []
+      }
+      purge_log: {
+        Row: {
+          created_at: string
+          detail: Json | null
+          entitas: string
+          id: string
+          jumlah: number
+        }
+        Insert: {
+          created_at?: string
+          detail?: Json | null
+          entitas: string
+          id?: string
+          jumlah: number
+        }
+        Update: {
+          created_at?: string
+          detail?: Json | null
+          entitas?: string
+          id?: string
+          jumlah?: number
         }
         Relationships: []
       }
@@ -380,6 +439,7 @@ export type Database = {
     }
     Functions: {
       expire_reservasi_lewat: { Args: never; Returns: number }
+      hapus_permanen_buku: { Args: { _buku_id: string }; Returns: undefined }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -389,11 +449,17 @@ export type Database = {
       }
       hitung_denda_untuk: { Args: { _peminjaman_id: string }; Returns: number }
       is_staff: { Args: { _user_id: string }; Returns: boolean }
+      kembalikan_versi_buku: {
+        Args: { _history_id: string }
+        Returns: undefined
+      }
       mahasiswa_layak_pinjam: { Args: { _user_id: string }; Returns: boolean }
       promosikan_reservasi_berikutnya: {
         Args: { _buku_id: string; _eksemplar_id: string }
         Returns: string
       }
+      pulihkan_buku: { Args: { _buku_id: string }; Returns: undefined }
+      purge_buku_terhapus_lama: { Args: never; Returns: number }
       tandai_peminjaman_terlambat: { Args: never; Returns: number }
     }
     Enums: {
