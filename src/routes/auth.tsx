@@ -19,13 +19,23 @@ export const Route = createFileRoute("/auth")({
   }),
 });
 
+// Seed akun demo sekali secara DIAM-DIAM (kredensial TIDAK ditampilkan di web).
+let demoSeeded = false;
+
 function AuthPage() {
   const navigate = useNavigate();
+  const seedDemo = useServerFn(seedDemoAccounts);
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
       if (data.session) navigate({ to: "/app" });
     });
   }, [navigate]);
+  useEffect(() => {
+    if (demoSeeded) return;
+    demoSeeded = true;
+    // Pastikan akun demo tersedia tanpa menampilkan email/sandi di UI.
+    seedDemo({}).catch(() => {});
+  }, [seedDemo]);
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-gradient-to-b from-secondary/40 to-background px-4 py-10">
@@ -45,7 +55,6 @@ function AuthPage() {
             </Tabs>
           </CardContent>
         </Card>
-        <DemoAccountsCard />
         <p className="text-center text-xs text-muted-foreground">
           <Link to="/" className="hover:underline">← Kembali ke beranda</Link>
         </p>
@@ -202,52 +211,5 @@ function ForgotForm() {
         {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Kirim tautan reset
       </Button>
     </form>
-  );
-}
-
-function DemoAccountsCard() {
-  const seed = useServerFn(seedDemoAccounts);
-  const [loading, setLoading] = useState(false);
-  const [accs, setAccs] = useState<{ email: string; password: string; role: string }[] | null>(null);
-
-  async function onSeed() {
-    setLoading(true);
-    try {
-      const res = await seed({});
-      setAccs(res.accounts);
-      toast.success("Akun demo siap digunakan.");
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Gagal menyiapkan akun demo.");
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  return (
-    <Card className="border-dashed">
-      <CardContent className="space-y-3 pt-6">
-        <div className="flex items-center justify-between gap-2">
-          <div>
-            <p className="text-sm font-semibold">Akun demo</p>
-            <p className="text-xs text-muted-foreground">Untuk uji coba admin & mahasiswa.</p>
-          </div>
-          <Button size="sm" variant="outline" onClick={onSeed} disabled={loading}>
-            {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            {accs ? "Perbarui" : "Siapkan"}
-          </Button>
-        </div>
-        {accs && (
-          <div className="space-y-2 rounded-md bg-muted p-3 text-xs">
-            {accs.map((a) => (
-              <div key={a.email} className="flex flex-col">
-                <span className="font-medium capitalize text-primary">{a.role}</span>
-                <span>Email: <code>{a.email}</code></span>
-                <span>Sandi: <code>{a.password}</code></span>
-              </div>
-            ))}
-          </div>
-        )}
-      </CardContent>
-    </Card>
   );
 }

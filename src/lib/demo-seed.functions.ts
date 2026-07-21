@@ -53,9 +53,10 @@ export const seedDemoAccounts = createServerFn({ method: "POST" }).handler(async
     results.push({ email: acc.email, created: !existing });
   }
 
+  // Jangan pernah kirim password ke klien.
   return {
     ok: true,
-    accounts: DEMO.map((d) => ({ email: d.email, password: d.password, role: d.role })),
+    accounts: DEMO.map((d) => ({ email: d.email, role: d.role })),
     results,
   };
 });
