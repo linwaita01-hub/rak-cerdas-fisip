@@ -65,6 +65,53 @@ export type Database = {
         }
         Relationships: []
       }
+      denda: {
+        Row: {
+          catatan: string | null
+          created_at: string
+          dibebaskan_oleh: string | null
+          dilunasi_oleh: string | null
+          id: string
+          jumlah: number
+          peminjaman_id: string
+          status: Database["public"]["Enums"]["denda_status"]
+          tanggal_dihitung: string
+          updated_at: string
+        }
+        Insert: {
+          catatan?: string | null
+          created_at?: string
+          dibebaskan_oleh?: string | null
+          dilunasi_oleh?: string | null
+          id?: string
+          jumlah?: number
+          peminjaman_id: string
+          status?: Database["public"]["Enums"]["denda_status"]
+          tanggal_dihitung?: string
+          updated_at?: string
+        }
+        Update: {
+          catatan?: string | null
+          created_at?: string
+          dibebaskan_oleh?: string | null
+          dilunasi_oleh?: string | null
+          id?: string
+          jumlah?: number
+          peminjaman_id?: string
+          status?: Database["public"]["Enums"]["denda_status"]
+          tanggal_dihitung?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "denda_peminjaman_id_fkey"
+            columns: ["peminjaman_id"]
+            isOneToOne: true
+            referencedRelation: "peminjaman"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       eksemplar: {
         Row: {
           barcode_value: string
@@ -169,6 +216,36 @@ export type Database = {
           },
         ]
       }
+      pengaturan_denda: {
+        Row: {
+          batas_ambil_reservasi_jam: number
+          grace_days: number
+          id: number
+          max_denda: number | null
+          tarif_per_hari: number
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          batas_ambil_reservasi_jam?: number
+          grace_days?: number
+          id?: number
+          max_denda?: number | null
+          tarif_per_hari?: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          batas_ambil_reservasi_jam?: number
+          grace_days?: number
+          id?: number
+          max_denda?: number | null
+          tarif_per_hari?: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           created_at: string
@@ -202,6 +279,63 @@ export type Database = {
         }
         Relationships: []
       }
+      reservasi: {
+        Row: {
+          buku_id: string
+          created_at: string
+          eksemplar_id: string | null
+          id: string
+          posisi_antrian: number
+          status: Database["public"]["Enums"]["reservasi_status"]
+          tanggal_kadaluarsa: string | null
+          tanggal_reservasi: string
+          tanggal_tersedia: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          buku_id: string
+          created_at?: string
+          eksemplar_id?: string | null
+          id?: string
+          posisi_antrian?: number
+          status?: Database["public"]["Enums"]["reservasi_status"]
+          tanggal_kadaluarsa?: string | null
+          tanggal_reservasi?: string
+          tanggal_tersedia?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          buku_id?: string
+          created_at?: string
+          eksemplar_id?: string | null
+          id?: string
+          posisi_antrian?: number
+          status?: Database["public"]["Enums"]["reservasi_status"]
+          tanggal_kadaluarsa?: string | null
+          tanggal_reservasi?: string
+          tanggal_tersedia?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reservasi_buku_id_fkey"
+            columns: ["buku_id"]
+            isOneToOne: false
+            referencedRelation: "buku"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reservasi_eksemplar_id_fkey"
+            columns: ["eksemplar_id"]
+            isOneToOne: false
+            referencedRelation: "eksemplar"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_roles: {
         Row: {
           created_at: string
@@ -231,6 +365,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      expire_reservasi_lewat: { Args: never; Returns: number }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -238,10 +373,18 @@ export type Database = {
         }
         Returns: boolean
       }
+      hitung_denda_untuk: { Args: { _peminjaman_id: string }; Returns: number }
       is_staff: { Args: { _user_id: string }; Returns: boolean }
+      mahasiswa_layak_pinjam: { Args: { _user_id: string }; Returns: boolean }
+      promosikan_reservasi_berikutnya: {
+        Args: { _buku_id: string; _eksemplar_id: string }
+        Returns: string
+      }
+      tandai_peminjaman_terlambat: { Args: never; Returns: number }
     }
     Enums: {
       app_role: "super_admin" | "admin" | "admin_sementara" | "mahasiswa"
+      denda_status: "belum_bayar" | "lunas" | "dibebaskan"
       eksemplar_status: "tersedia" | "dipinjam" | "dipesan" | "hilang" | "rusak"
       peminjaman_status:
         | "menunggu"
@@ -250,6 +393,12 @@ export type Database = {
         | "dipinjam"
         | "dikembalikan"
         | "terlambat"
+      reservasi_status:
+        | "menunggu"
+        | "tersedia"
+        | "diambil"
+        | "kadaluarsa"
+        | "batal"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -378,6 +527,7 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["super_admin", "admin", "admin_sementara", "mahasiswa"],
+      denda_status: ["belum_bayar", "lunas", "dibebaskan"],
       eksemplar_status: ["tersedia", "dipinjam", "dipesan", "hilang", "rusak"],
       peminjaman_status: [
         "menunggu",
@@ -386,6 +536,13 @@ export const Constants = {
         "dipinjam",
         "dikembalikan",
         "terlambat",
+      ],
+      reservasi_status: [
+        "menunggu",
+        "tersedia",
+        "diambil",
+        "kadaluarsa",
+        "batal",
       ],
     },
   },
