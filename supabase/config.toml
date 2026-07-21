@@ -1,1 +1,7 @@
 project_id = "ehftibpdwpeszobzagua"
+
+# Edge function pengirim Web Push. verify_jwt=false karena dipanggil oleh
+# pg_net/pg_cron (bukan klien ber-JWT); autentikasi memakai header
+# x-notif-secret yang dicek terhadap secret NOTIF_SECRET.
+[functions.kirim-notifikasi]
+verify_jwt = false

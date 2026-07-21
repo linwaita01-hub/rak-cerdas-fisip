@@ -8,6 +8,7 @@ import { Loader2, LogOut } from "lucide-react";
 import { toast } from "sonner";
 import { StaffDashboard } from "@/components/dashboard/StaffDashboard";
 import { MahasiswaDashboard } from "@/components/dashboard/MahasiswaDashboard";
+import { PushToggle } from "@/components/PushToggle";
 import { useEffect } from "react";
 
 export const Route = createFileRoute("/_authenticated/app")({
@@ -32,19 +33,28 @@ function AppHome() {
   }
 
   if (loading) {
-    return <div className="flex min-h-screen items-center justify-center"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>;
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <Loader2 className="h-6 w-6 animate-spin text-primary" />
+      </div>
+    );
   }
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-secondary/30 to-background">
       <header className="border-b bg-card/80 backdrop-blur">
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-3">
-          <Link to="/app"><BrandHeader /></Link>
+          <Link to="/app">
+            <BrandHeader />
+          </Link>
           <div className="flex items-center gap-2">
             <div className="hidden text-right sm:block">
               <p className="text-sm font-medium">{profile?.nama ?? profile?.email}</p>
-              <Badge variant="secondary" className="capitalize text-[10px]">{role?.replace("_", " ")}</Badge>
+              <Badge variant="secondary" className="capitalize text-[10px]">
+                {role?.replace("_", " ")}
+              </Badge>
             </div>
+            <PushToggle />
             <Button variant="ghost" size="sm" onClick={onLogout}>
               <LogOut className="mr-2 h-4 w-4" /> Keluar
             </Button>
