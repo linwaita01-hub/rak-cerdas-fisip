@@ -14,16 +14,242 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      buku: {
+        Row: {
+          created_at: string
+          deleted_at: string | null
+          deskripsi: string | null
+          id: string
+          isbn: string | null
+          judul: string
+          kategori: string | null
+          kode_buku: string
+          lokasi_rak: string | null
+          penerbit: string | null
+          pengarang: string | null
+          sampul_path: string | null
+          tahun_terbit: number | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          deleted_at?: string | null
+          deskripsi?: string | null
+          id?: string
+          isbn?: string | null
+          judul: string
+          kategori?: string | null
+          kode_buku: string
+          lokasi_rak?: string | null
+          penerbit?: string | null
+          pengarang?: string | null
+          sampul_path?: string | null
+          tahun_terbit?: number | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          deleted_at?: string | null
+          deskripsi?: string | null
+          id?: string
+          isbn?: string | null
+          judul?: string
+          kategori?: string | null
+          kode_buku?: string
+          lokasi_rak?: string | null
+          penerbit?: string | null
+          pengarang?: string | null
+          sampul_path?: string | null
+          tahun_terbit?: number | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      eksemplar: {
+        Row: {
+          barcode_value: string
+          buku_id: string
+          created_at: string
+          deleted_at: string | null
+          id: string
+          kode_eksemplar: string
+          status: Database["public"]["Enums"]["eksemplar_status"]
+          updated_at: string
+        }
+        Insert: {
+          barcode_value: string
+          buku_id: string
+          created_at?: string
+          deleted_at?: string | null
+          id?: string
+          kode_eksemplar: string
+          status?: Database["public"]["Enums"]["eksemplar_status"]
+          updated_at?: string
+        }
+        Update: {
+          barcode_value?: string
+          buku_id?: string
+          created_at?: string
+          deleted_at?: string | null
+          id?: string
+          kode_eksemplar?: string
+          status?: Database["public"]["Enums"]["eksemplar_status"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "eksemplar_buku_id_fkey"
+            columns: ["buku_id"]
+            isOneToOne: false
+            referencedRelation: "buku"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      peminjaman: {
+        Row: {
+          buku_id: string | null
+          catatan: string | null
+          created_at: string
+          disetujui_oleh: string | null
+          durasi_hari: number | null
+          eksemplar_id: string | null
+          id: string
+          status: Database["public"]["Enums"]["peminjaman_status"]
+          tanggal_jatuh_tempo: string | null
+          tanggal_kembali: string | null
+          tanggal_pengajuan: string
+          tanggal_pinjam: string | null
+          user_id: string
+        }
+        Insert: {
+          buku_id?: string | null
+          catatan?: string | null
+          created_at?: string
+          disetujui_oleh?: string | null
+          durasi_hari?: number | null
+          eksemplar_id?: string | null
+          id?: string
+          status?: Database["public"]["Enums"]["peminjaman_status"]
+          tanggal_jatuh_tempo?: string | null
+          tanggal_kembali?: string | null
+          tanggal_pengajuan?: string
+          tanggal_pinjam?: string | null
+          user_id: string
+        }
+        Update: {
+          buku_id?: string | null
+          catatan?: string | null
+          created_at?: string
+          disetujui_oleh?: string | null
+          durasi_hari?: number | null
+          eksemplar_id?: string | null
+          id?: string
+          status?: Database["public"]["Enums"]["peminjaman_status"]
+          tanggal_jatuh_tempo?: string | null
+          tanggal_kembali?: string | null
+          tanggal_pengajuan?: string
+          tanggal_pinjam?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "peminjaman_buku_id_fkey"
+            columns: ["buku_id"]
+            isOneToOne: false
+            referencedRelation: "buku"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "peminjaman_eksemplar_id_fkey"
+            columns: ["eksemplar_id"]
+            isOneToOne: false
+            referencedRelation: "eksemplar"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profiles: {
+        Row: {
+          created_at: string
+          email: string | null
+          id: string
+          is_profile_completed: boolean
+          nama: string | null
+          nim: string | null
+          prodi: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          email?: string | null
+          id: string
+          is_profile_completed?: boolean
+          nama?: string | null
+          nim?: string | null
+          prodi?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          email?: string | null
+          id?: string
+          is_profile_completed?: boolean
+          nama?: string | null
+          nim?: string | null
+          prodi?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      user_roles: {
+        Row: {
+          created_at: string
+          expires_at: string | null
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          expires_at?: string | null
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          expires_at?: string | null
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
+      is_staff: { Args: { _user_id: string }; Returns: boolean }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "super_admin" | "admin" | "admin_sementara" | "mahasiswa"
+      eksemplar_status: "tersedia" | "dipinjam" | "dipesan" | "hilang" | "rusak"
+      peminjaman_status:
+        | "menunggu"
+        | "disetujui"
+        | "ditolak"
+        | "dipinjam"
+        | "dikembalikan"
+        | "terlambat"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +376,17 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["super_admin", "admin", "admin_sementara", "mahasiswa"],
+      eksemplar_status: ["tersedia", "dipinjam", "dipesan", "hilang", "rusak"],
+      peminjaman_status: [
+        "menunggu",
+        "disetujui",
+        "ditolak",
+        "dipinjam",
+        "dikembalikan",
+        "terlambat",
+      ],
+    },
   },
 } as const
