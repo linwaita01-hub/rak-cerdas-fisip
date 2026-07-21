@@ -263,6 +263,7 @@ function TabInventaris() {
   const [search, setSearch] = useState("");
   const [editBuku, setEditBuku] = useState<any | null>(null);
   const [detail, setDetail] = useState<any | null>(null);
+  const [picked, setPicked] = useState<Set<string>>(new Set());
 
   const books = useQuery({
     queryKey: ["buku-list", search],
@@ -275,6 +276,10 @@ function TabInventaris() {
     },
   });
 
+  const allRows = books.data ?? [];
+  const selectedRows = allRows.filter((b: any) => picked.has(b.id));
+  const allChecked = allRows.length > 0 && picked.size === allRows.length;
+
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-2">
@@ -282,18 +287,34 @@ function TabInventaris() {
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input placeholder="Cari judul / pengarang / kode…" value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9" />
         </div>
+        <ExportBukuButton selected={selectedRows} allRows={allRows} />
+        <ImportBukuButton />
         <Button onClick={() => setEditBuku({})}><Plus className="mr-2 h-4 w-4" />Buku baru</Button>
       </div>
 
+      <div className="flex items-center gap-2 rounded-md border bg-muted/40 px-3 py-2 text-sm">
+        <Checkbox checked={allChecked} onCheckedChange={(v) => {
+          setPicked(v ? new Set(allRows.map((b: any) => b.id)) : new Set());
+        }} />
+        <span>Pilih Semua</span>
+        {picked.size > 0 && <span className="text-muted-foreground">— {picked.size} dipilih</span>}
+      </div>
+
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        {books.data?.map((b: any) => {
+        {allRows.map((b: any) => {
           const tersedia = b.eksemplar?.filter((e: any) => e.status === "tersedia").length ?? 0;
           const total = b.eksemplar?.length ?? 0;
+          const checked = picked.has(b.id);
           return (
             <Card key={b.id} className="transition hover:shadow-md">
-              <CardHeader>
-                <CardTitle className="line-clamp-2 text-base">{b.judul}</CardTitle>
-                <p className="text-xs text-muted-foreground">{b.pengarang ?? "—"} · {b.kode_buku}</p>
+              <CardHeader className="flex flex-row items-start gap-2 space-y-0">
+                <Checkbox checked={checked} onCheckedChange={(v) => {
+                  setPicked((prev) => { const n = new Set(prev); v ? n.add(b.id) : n.delete(b.id); return n; });
+                }} className="mt-1" />
+                <div className="flex-1">
+                  <CardTitle className="line-clamp-2 text-base">{b.judul}</CardTitle>
+                  <p className="text-xs text-muted-foreground">{b.pengarang ?? "—"} · {b.kode_buku}</p>
+                </div>
               </CardHeader>
               <CardContent className="space-y-2">
                 <div className="flex flex-wrap gap-2 text-xs">
@@ -301,11 +322,12 @@ function TabInventaris() {
                   <Badge variant={tersedia > 0 ? "default" : "destructive"}>{tersedia}/{total} tersedia</Badge>
                 </div>
                 <div className="flex flex-wrap gap-2 pt-2">
-                  <Button size="sm" variant="outline" onClick={() => setDetail(b)}>Kelola eksemplar</Button>
+                  <Button size="sm" variant="outline" onClick={() => setDetail(b)}>Eksemplar</Button>
                   <Button size="sm" variant="ghost" onClick={() => setEditBuku(b)}>Ubah</Button>
+                  <HistoryButton bukuId={b.id} bukuJudul={b.judul} />
                   <Button size="sm" variant="ghost" className="text-destructive" onClick={async () => {
-                    if (!confirm("Hapus buku ini?")) return;
-                    try { await hapus({ data: { id: b.id } }); toast.success("Dihapus."); qc.invalidateQueries({ queryKey: ["buku-list"] }); }
+                    if (!confirm("Pindahkan buku ini ke tempat sampah?")) return;
+                    try { await hapus({ data: { id: b.id } }); toast.success("Dipindahkan ke tempat sampah."); qc.invalidateQueries({ queryKey: ["buku-list"] }); }
                     catch (e) { toast.error(e instanceof Error ? e.message : "Gagal."); }
                   }}>Hapus</Button>
                 </div>
@@ -313,8 +335,9 @@ function TabInventaris() {
             </Card>
           );
         })}
-        {books.data?.length === 0 && <p className="text-sm text-muted-foreground">Tidak ada buku.</p>}
+        {allRows.length === 0 && <p className="text-sm text-muted-foreground">Tidak ada buku.</p>}
       </div>
+
 
       {/* Dialog edit buku */}
       <Dialog open={!!editBuku} onOpenChange={(o) => !o && setEditBuku(null)}>
