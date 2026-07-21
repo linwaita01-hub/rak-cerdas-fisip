@@ -268,6 +268,7 @@ export const simpanPengaturan = createServerFn({ method: "POST" })
     grace_days: z.number().int().min(0).max(30),
     max_denda: z.number().min(0).nullable(),
     batas_ambil_reservasi_jam: z.number().int().min(1).max(240),
+    purge_hari: z.number().int().min(1).max(3650),
   }).parse(d))
   .handler(async ({ data, context }) => {
     await ensureStaff(context);
