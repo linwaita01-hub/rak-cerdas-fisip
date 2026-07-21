@@ -133,6 +133,12 @@ function RootShell({ children }: { children: ReactNode }) {
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
 
+  // Penanda hidrasi klien (dipakai test E2E untuk menunggu React siap sebelum
+  // berinteraksi). Efek hanya berjalan setelah hidrasi.
+  useEffect(() => {
+    (window as unknown as { __perpusReady?: boolean }).__perpusReady = true;
+  }, []);
+
   return (
     <QueryClientProvider client={queryClient}>
       <Outlet />
