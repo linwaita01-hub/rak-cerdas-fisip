@@ -288,3 +288,79 @@ export const jalankanSweepTerlambat = createServerFn({ method: "POST" })
     const { data: b } = await supabaseAdmin.rpc("expire_reservasi_lewat");
     return { diperiksa: a ?? 0, reservasi_kadaluarsa: b ?? 0 };
   });
+
+// ============= STAFF: IMPOR MASSAL =============
+const imporRow = z.object({
+  kode_buku: z.string().min(1),
+  judul: z.string().min(1),
+  pengarang: z.string().nullish(),
+  penerbit: z.string().nullish(),
+  tahun_terbit: z.number().int().nullish(),
+  isbn: z.string().nullish(),
+  kategori: z.string().nullish(),
+  lokasi_rak: z.string().nullish(),
+  deskripsi: z.string().nullish(),
+  jumlah_eksemplar: z.number().int().min(0).max(200).nullish(),
+});
+
+export const imporBukuMassal = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) =>
+    z.object({
+      mode: z.enum(["skip", "overwrite"]),
+      rows: z.array(imporRow).min(1).max(5000),
+    }).parse(d),
+  )
+  .handler(async ({ data, context }) => {
+    await ensureStaff(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    // Ambil daftar kode_buku yg sudah ada
+    const kodes = data.rows.map((r) => r.kode_buku);
+    const { data: existing } = await supabaseAdmin
+      .from("buku").select("id, kode_buku").in("kode_buku", kodes);
+    const existingMap = new Map((existing ?? []).map((b) => [b.kode_buku, b.id]));
+
+    let inserted = 0, updated = 0, skipped = 0, eksemplarDibuat = 0;
+
+    for (const r of data.rows) {
+      const payload = {
+        kode_buku: r.kode_buku,
+        judul: r.judul,
+        pengarang: r.pengarang ?? null,
+        penerbit: r.penerbit ?? null,
+        tahun_terbit: r.tahun_terbit ?? null,
+        isbn: r.isbn ?? null,
+        kategori: r.kategori ?? null,
+        lokasi_rak: r.lokasi_rak ?? null,
+        deskripsi: r.deskripsi ?? null,
+      };
+      const existingId = existingMap.get(r.kode_buku);
+      let bukuId: string | undefined;
+      let created = false;
+      if (existingId) {
+        if (data.mode === "skip") { skipped++; continue; }
+        const { error } = await supabaseAdmin.from("buku")
+          .update({ ...payload, deleted_at: null }).eq("id", existingId);
+        if (error) throw new Error(`Gagal update ${r.kode_buku}: ${error.message}`);
+        bukuId = existingId; updated++;
+      } else {
+        const { data: ins, error } = await supabaseAdmin.from("buku")
+          .insert(payload).select("id").single();
+        if (error) throw new Error(`Gagal insert ${r.kode_buku}: ${error.message}`);
+        bukuId = ins.id; inserted++; created = true;
+      }
+
+      // Buat eksemplar hanya untuk buku baru
+      if (created && bukuId && r.jumlah_eksemplar && r.jumlah_eksemplar > 0) {
+        const rows = Array.from({ length: r.jumlah_eksemplar }, (_, i) => {
+          const kode = `${r.kode_buku}-${String(i + 1).padStart(4, "0")}`;
+          return { buku_id: bukuId!, kode_eksemplar: kode, barcode_value: kode, status: "tersedia" as const };
+        });
+        const { error: eErr } = await supabaseAdmin.from("eksemplar").insert(rows);
+        if (!eErr) eksemplarDibuat += rows.length;
+      }
+    }
+
+    return { inserted, updated, skipped, eksemplarDibuat };
+  });
