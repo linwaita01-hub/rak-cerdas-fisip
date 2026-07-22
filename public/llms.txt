@@ -1,0 +1,10 @@
+# Perpustakaan FISIP Universitas Lambung Mangkurat
+
+> Sistem peminjaman buku digital Perpustakaan Fakultas Ilmu Sosial dan Ilmu Politik (FISIP) Universitas Lambung Mangkurat. Mahasiswa dapat mencari katalog, mengajukan peminjaman, memantau denda, dan reservasi; petugas mengelola inventaris, transaksi, serta cetak barcode eksemplar.
+
+Aplikasi web progresif (PWA) berbahasa Indonesia untuk lingkungan FISIP ULM. Fitur utama: katalog buku, peminjaman berbasis pindai barcode (scanner USB & kamera), reservasi antrian otomatis, perhitungan denda keterlambatan, serta manajemen eksemplar per unit fisik.
+
+## Pages
+
+- [Beranda](/): Ringkasan layanan dan pintu masuk peminjaman buku.
+- [Masuk atau Daftar](/auth): Autentikasi mahasiswa dan petugas perpustakaan.

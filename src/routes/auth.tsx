@@ -10,10 +10,24 @@ import { Card, CardContent } from "@/components/ui/card";
 import { toast } from "sonner";
 import { Eye, EyeOff, Loader2 } from "lucide-react";
 
+const AUTH_URL = "https://rak-cerdas-fisip.lovable.app/auth";
+const AUTH_TITLE = "Masuk atau Daftar — Perpus FISIP ULM";
+const AUTH_DESC = "Masuk sebagai mahasiswa atau petugas Perpustakaan FISIP ULM, daftar akun mahasiswa baru, atau atur ulang sandi Anda.";
+
 export const Route = createFileRoute("/auth")({
   component: AuthPage,
   head: () => ({
-    meta: [{ title: "Masuk — Perpus FISIP ULM" }],
+    meta: [
+      { title: AUTH_TITLE },
+      { name: "description", content: AUTH_DESC },
+      { property: "og:title", content: AUTH_TITLE },
+      { property: "og:description", content: AUTH_DESC },
+      { property: "og:url", content: AUTH_URL },
+      { name: "twitter:title", content: AUTH_TITLE },
+      { name: "twitter:description", content: AUTH_DESC },
+      { name: "robots", content: "noindex,follow" },
+    ],
+    links: [{ rel: "canonical", href: AUTH_URL }],
   }),
 });
 
@@ -45,7 +59,7 @@ function AuthPage() {
           </CardContent>
         </Card>
         <p className="text-center text-xs text-muted-foreground">
-          <Link to="/" className="hover:underline">← Kembali ke beranda</Link>
+          <Link to="/" className="hover:underline">← Kembali ke beranda Perpustakaan FISIP ULM</Link>
         </p>
       </div>
     </main>
