@@ -3,7 +3,7 @@ import logo from "@/assets/logo-unlam.png.asset.json";
 export function BrandHeader({ subtitle }: { subtitle?: string }) {
   return (
     <div className="flex flex-col items-center gap-3 text-center">
-      <img src={logo.url} alt="Logo Universitas Lambung Mangkurat" className="h-20 w-20 object-contain" />
+      <img src={logo.url} alt="Lambang Universitas Lambung Mangkurat berupa perisai segi lima kuning dengan simbol burung merah di tengah" className="h-20 w-20 object-contain" />
       <div>
         <h1 className="text-lg font-bold leading-tight text-primary">
           Perpustakaan FISIP
