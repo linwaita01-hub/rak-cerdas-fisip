@@ -83,7 +83,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       {
         name: "description",
         content:
-          "Sistem peminjaman buku Perpustakaan FISIP Universitas Lambung Mangkurat — ajukan, setujui, dan kembalikan buku dengan barcode.",
+          "Sistem peminjaman buku Perpustakaan FISIP Universitas Lambung Mangkurat.",
       },
       { property: "og:title", content: "Peminjaman Buku Perpus UNLAM FISIP" },
       {
@@ -98,6 +98,10 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { name: "apple-mobile-web-app-capable", content: "yes" },
       { name: "apple-mobile-web-app-status-bar-style", content: "black-translucent" },
       { name: "apple-mobile-web-app-title", content: "Perpus FISIP ULM" },
+      { name: "twitter:title", content: "Peminjaman Buku Perpus UNLAM FISIP" },
+      { name: "twitter:description", content: "Sistem peminjaman buku Perpustakaan FISIP Universitas Lambung Mangkurat." },
+      { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/ffe8b974-8c2a-47d2-86d0-c598e144da9e/id-preview-7d49e030--8d716ddb-2516-4ad4-8c7a-d1bfdc57be35.lovable.app-1784672728957.png" },
+      { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/ffe8b974-8c2a-47d2-86d0-c598e144da9e/id-preview-7d49e030--8d716ddb-2516-4ad4-8c7a-d1bfdc57be35.lovable.app-1784672728957.png" },
     ],
     links: [
       { rel: "stylesheet", href: appCss },
