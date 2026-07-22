@@ -59,7 +59,7 @@ export async function aktifkanNotifikasi(): Promise<void> {
     throw new Error("Langganan push tidak lengkap.");
   }
 
-  const { error } = await supabase.from("push_subscriptions").upsert(
+  const { error } = await (supabase as any).from("push_subscriptions").upsert(
     {
       user_id: u.user.id,
       endpoint: json.endpoint,
@@ -79,6 +79,6 @@ export async function matikanNotifikasi(): Promise<void> {
   if (sub) {
     const endpoint = sub.endpoint;
     await sub.unsubscribe().catch(() => undefined);
-    await supabase.from("push_subscriptions").delete().eq("endpoint", endpoint);
+    await (supabase as any).from("push_subscriptions").delete().eq("endpoint", endpoint);
   }
 }
