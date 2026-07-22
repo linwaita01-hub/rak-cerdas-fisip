@@ -1,8 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
-import { seedDemoAccounts } from "@/lib/demo-seed.functions";
 import { BrandHeader } from "@/components/BrandHeader";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -19,23 +17,14 @@ export const Route = createFileRoute("/auth")({
   }),
 });
 
-// Seed akun demo sekali secara DIAM-DIAM (kredensial TIDAK ditampilkan di web).
-let demoSeeded = false;
-
 function AuthPage() {
   const navigate = useNavigate();
-  const seedDemo = useServerFn(seedDemoAccounts);
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
       if (data.session) navigate({ to: "/app" });
     });
   }, [navigate]);
-  useEffect(() => {
-    if (demoSeeded) return;
-    demoSeeded = true;
-    // Pastikan akun demo tersedia tanpa menampilkan email/sandi di UI.
-    seedDemo({}).catch(() => {});
-  }, [seedDemo]);
+
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-gradient-to-b from-secondary/40 to-background px-4 py-10">
