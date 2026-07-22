@@ -79,6 +79,6 @@ export async function matikanNotifikasi(): Promise<void> {
   if (sub) {
     const endpoint = sub.endpoint;
     await sub.unsubscribe().catch(() => undefined);
-    await supabase.from("push_subscriptions").delete().eq("endpoint", endpoint);
+    await (supabase as any).from("push_subscriptions").delete().eq("endpoint", endpoint);
   }
 }
