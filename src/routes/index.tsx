@@ -5,13 +5,26 @@ import { BrandHeader } from "@/components/BrandHeader";
 import { Button } from "@/components/ui/button";
 import { BookOpen, ScanLine, ShieldCheck } from "lucide-react";
 
+const PAGE_URL = "https://rak-cerdas-fisip.lovable.app/";
+const PAGE_IMG = "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/ffe8b974-8c2a-47d2-86d0-c598e144da9e/id-preview-7d49e030--8d716ddb-2516-4ad4-8c7a-d1bfdc57be35.lovable.app-1784672728957.png";
+const PAGE_TITLE = "Peminjaman Buku Perpus FISIP ULM — Katalog & Layanan Mahasiswa";
+const PAGE_DESC = "Beranda layanan peminjaman buku Perpustakaan FISIP Universitas Lambung Mangkurat: pencarian katalog, ajukan pinjaman, dan pantau status via barcode.";
+
 export const Route = createFileRoute("/")({
   component: Landing,
   head: () => ({
     meta: [
-      { title: "Peminjaman Buku Perpus UNLAM FISIP" },
-      { name: "description", content: "Sistem peminjaman buku Perpustakaan FISIP Universitas Lambung Mangkurat." },
+      { title: PAGE_TITLE },
+      { name: "description", content: PAGE_DESC },
+      { property: "og:title", content: PAGE_TITLE },
+      { property: "og:description", content: PAGE_DESC },
+      { property: "og:url", content: PAGE_URL },
+      { property: "og:image", content: PAGE_IMG },
+      { name: "twitter:title", content: PAGE_TITLE },
+      { name: "twitter:description", content: PAGE_DESC },
+      { name: "twitter:image", content: PAGE_IMG },
     ],
+    links: [{ rel: "canonical", href: PAGE_URL }],
   }),
 });
 
