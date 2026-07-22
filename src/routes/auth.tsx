@@ -59,7 +59,7 @@ function AuthPage() {
           </CardContent>
         </Card>
         <p className="text-center text-xs text-muted-foreground">
-          <Link to="/" className="hover:underline">← Kembali ke beranda</Link>
+          <Link to="/" className="hover:underline">← Kembali ke beranda Perpustakaan FISIP ULM</Link>
         </p>
       </div>
     </main>
