@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { Link } from "@tanstack/react-router";
@@ -26,7 +26,20 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Loader2, Plus, Printer, Trash2, Search, Check, X, RefreshCw, Table2 } from "lucide-react";
+import {
+  Loader2,
+  Plus,
+  Printer,
+  Trash2,
+  Search,
+  RefreshCw,
+  Table2,
+  Clock,
+  BookOpen,
+  ScanLine,
+  Send,
+} from "lucide-react";
+import { KONFIRMASI_DETIK } from "@/lib/pinjam";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   ExportBukuButton,
@@ -40,8 +53,7 @@ import { BarcodeScannerInput } from "@/components/BarcodeScannerInput";
 import { fmtIDR, fmtWITA, useMe } from "@/hooks/useMe";
 import { AdminSementaraPanel } from "@/components/dashboard/AdminSementaraPanel";
 import {
-  setujuiPeminjaman,
-  tolakPeminjaman,
+  mulaiPeminjamanMeja,
   kembalikanBarcode,
   bayarDenda,
   bebaskanDenda,
@@ -94,8 +106,6 @@ export function StaffDashboard() {
 // ============= TAB TRANSAKSI =============
 function TabTransaksi() {
   const qc = useQueryClient();
-  const setujui = useServerFn(setujuiPeminjaman);
-  const tolak = useServerFn(tolakPeminjaman);
   const kembalikan = useServerFn(kembalikanBarcode);
   const bayar = useServerFn(bayarDenda);
   const bebaskan = useServerFn(bebaskanDenda);
@@ -106,7 +116,7 @@ function TabTransaksi() {
     const ch = supabase
       .channel("staff-transaksi")
       .on("postgres_changes", { event: "*", schema: "public", table: "peminjaman" }, () => {
-        qc.invalidateQueries({ queryKey: ["antrian"] });
+        qc.invalidateQueries({ queryKey: ["menunggu-konfirmasi"] });
         qc.invalidateQueries({ queryKey: ["pinjaman-aktif"] });
       })
       .on("postgres_changes", { event: "*", schema: "public", table: "denda" }, () => {
@@ -118,14 +128,14 @@ function TabTransaksi() {
     };
   }, [qc]);
 
-  const antrian = useQuery({
-    queryKey: ["antrian"],
+  const menunggu = useQuery({
+    queryKey: ["menunggu-konfirmasi"],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("peminjaman")
         .select("*, buku:buku_id(id,judul,kode_buku), profil:user_id(id,nama,nim,prodi)")
         .eq("status", "menunggu")
-        .order("tanggal_pengajuan", { ascending: true });
+        .order("tanggal_pengajuan", { ascending: false });
       if (error) throw error;
       return data ?? [];
     },
@@ -159,21 +169,9 @@ function TabTransaksi() {
     },
   });
 
-  const [dialogSetuju, setDialogSetuju] = useState<null | any>(null);
-
-  async function onSetujuiSubmit(barcode: string, durasi: number) {
-    if (!dialogSetuju) return;
-    try {
-      await setujui({ data: { peminjaman_id: dialogSetuju.id, barcode, durasi_hari: durasi } });
-      toast.success("Peminjaman disetujui.");
-      setDialogSetuju(null);
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Gagal.");
-    }
-  }
-
   return (
     <div className="grid gap-6 lg:grid-cols-2">
+      <PinjamMejaCard />
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle className="text-base">Pengembalian (scan barcode)</CardTitle>
@@ -213,53 +211,10 @@ function TabTransaksi() {
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">
-            Antrian persetujuan ({antrian.data?.length ?? 0})
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-2">
-          {antrian.isLoading && <Loader2 className="h-4 w-4 animate-spin" />}
-          {antrian.data?.length === 0 && (
-            <p className="text-sm text-muted-foreground">Tidak ada pengajuan menunggu.</p>
-          )}
-          {antrian.data?.map((p: any) => (
-            <div
-              key={p.id}
-              className="flex flex-wrap items-center justify-between gap-2 rounded-md border p-3"
-            >
-              <div className="text-sm">
-                <p className="font-medium">{p.buku?.judul}</p>
-                <p className="text-xs text-muted-foreground">
-                  {p.profil?.nama} · {p.profil?.nim} · {fmtWITA(p.tanggal_pengajuan)}
-                </p>
-              </div>
-              <div className="flex gap-2">
-                <Button size="sm" onClick={() => setDialogSetuju(p)}>
-                  <Check className="mr-1 h-4 w-4" />
-                  Setujui (scan)
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={async () => {
-                    try {
-                      await tolak({ data: { peminjaman_id: p.id } });
-                      toast.success("Ditolak.");
-                    } catch (e) {
-                      toast.error(e instanceof Error ? e.message : "Gagal.");
-                    }
-                  }}
-                >
-                  <X className="mr-1 h-4 w-4" />
-                  Tolak
-                </Button>
-              </div>
-            </div>
-          ))}
-        </CardContent>
-      </Card>
+      <MenungguKonfirmasiCard
+        rows={(menunggu.data ?? []) as unknown as MenungguRow[]}
+        loading={menunggu.isLoading}
+      />
 
       <Card className="lg:col-span-2">
         <CardHeader>
@@ -390,48 +345,254 @@ function TabTransaksi() {
           </Table>
         </CardContent>
       </Card>
-
-      {/* Dialog setujui */}
-      <Dialog open={!!dialogSetuju} onOpenChange={(o) => !o && setDialogSetuju(null)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Setujui — scan eksemplar</DialogTitle>
-          </DialogHeader>
-          {dialogSetuju && (
-            <ApproveForm buku={dialogSetuju.buku?.judul} onSubmit={onSetujuiSubmit} />
-          )}
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }
 
-function ApproveForm({
-  buku,
-  onSubmit,
-}: {
-  buku?: string;
-  onSubmit: (b: string, d: number) => Promise<void>;
-}) {
+// ---- Kartu: Pinjam di meja (scan → pilih mahasiswa → kirim konfirmasi) ----
+function PinjamMejaCard() {
+  const qc = useQueryClient();
+  const mulai = useServerFn(mulaiPeminjamanMeja);
+  const [barcode, setBarcode] = useState("");
+  const [buku, setBuku] = useState<{ judul: string; kode: string; status: string } | null>(null);
+  const [cari, setCari] = useState("");
+  const [terpilih, setTerpilih] = useState<{
+    id: string;
+    nama: string | null;
+    nim: string | null;
+  } | null>(null);
   const [durasi, setDurasi] = useState(7);
+  const [busy, setBusy] = useState(false);
+
+  async function onScan(code: string) {
+    setBarcode(code);
+    const { data } = await supabase
+      .from("eksemplar")
+      .select("status, buku:buku_id(judul, kode_buku)")
+      .eq("barcode_value", code)
+      .is("deleted_at", null)
+      .maybeSingle();
+    if (!data) {
+      setBuku(null);
+      toast.error("Barcode eksemplar tidak dikenali.");
+      return;
+    }
+    const b = data.buku as unknown as { judul: string | null; kode_buku: string | null } | null;
+    setBuku({ judul: b?.judul ?? "—", kode: b?.kode_buku ?? "—", status: data.status });
+  }
+
+  const hasil = useQuery({
+    queryKey: ["cari-peminjam", cari],
+    enabled: cari.trim().length >= 2,
+    queryFn: async () => {
+      const s = cari.trim().replace(/[%,]/g, "");
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("id, nama, nim, prodi")
+        .or(`nama.ilike.%${s}%,nim.ilike.%${s}%,email.ilike.%${s}%`)
+        .limit(8);
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+
+  async function kirim() {
+    if (!barcode || !terpilih) return;
+    setBusy(true);
+    try {
+      const r = await mulai({ data: { barcode, user_id: terpilih.id, durasi_hari: durasi } });
+      toast.success(`Permintaan dikirim ke ${r.nama ?? "mahasiswa"} untuk dikonfirmasi.`);
+      setBarcode("");
+      setBuku(null);
+      setCari("");
+      setTerpilih(null);
+      qc.invalidateQueries({ queryKey: ["menunggu-konfirmasi"] });
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Gagal.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
-    <div className="space-y-4">
-      <p className="text-sm text-muted-foreground">
-        Untuk buku: <span className="font-medium text-foreground">{buku}</span>
-      </p>
-      <div className="space-y-2">
-        <Label>Durasi (hari)</Label>
-        <Input
-          type="number"
-          min={1}
-          max={60}
-          value={durasi}
-          onChange={(e) => setDurasi(Number(e.target.value) || 7)}
-        />
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2 text-base">
+          <ScanLine className="h-4 w-4" />
+          Pinjam di meja
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        <div className="space-y-1">
+          <Label className="text-xs">1. Scan barcode eksemplar</Label>
+          <BarcodeScannerInput autoFocus placeholder="Scan / ketik barcode buku…" onScan={onScan} />
+          {buku && (
+            <div className="mt-1 flex items-center gap-2 rounded-md border bg-muted/40 p-2 text-sm">
+              <BookOpen className="h-4 w-4 text-primary" />
+              <span className="font-medium">{buku.judul}</span>
+              <span className="text-xs text-muted-foreground">({buku.kode})</span>
+              <Badge
+                variant={buku.status === "tersedia" ? "default" : "destructive"}
+                className="ml-auto"
+              >
+                {buku.status}
+              </Badge>
+            </div>
+          )}
+        </div>
+
+        <div className="space-y-1">
+          <Label className="text-xs">2. Pilih mahasiswa peminjam</Label>
+          {terpilih ? (
+            <div className="flex items-center justify-between rounded-md border p-2 text-sm">
+              <span>
+                <span className="font-medium">{terpilih.nama ?? "—"}</span>{" "}
+                <span className="text-muted-foreground">({terpilih.nim ?? "—"})</span>
+              </span>
+              <Button size="sm" variant="ghost" onClick={() => setTerpilih(null)}>
+                Ganti
+              </Button>
+            </div>
+          ) : (
+            <>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  value={cari}
+                  onChange={(e) => setCari(e.target.value)}
+                  placeholder="Cari nama / NIM / email…"
+                  className="pl-9"
+                />
+              </div>
+              {cari.trim().length >= 2 && (
+                <div className="mt-1 max-h-40 space-y-1 overflow-auto">
+                  {hasil.isFetching && <Loader2 className="h-4 w-4 animate-spin" />}
+                  {hasil.data?.map((u) => (
+                    <button
+                      key={u.id}
+                      type="button"
+                      onClick={() => setTerpilih({ id: u.id, nama: u.nama, nim: u.nim })}
+                      className="flex w-full items-center justify-between rounded-md border p-2 text-left text-sm hover:bg-accent"
+                    >
+                      <span className="font-medium">{u.nama ?? "—"}</span>
+                      <span className="text-xs text-muted-foreground">
+                        {u.nim ?? "—"} · {u.prodi ?? "—"}
+                      </span>
+                    </button>
+                  ))}
+                  {!hasil.isFetching && !hasil.data?.length && (
+                    <p className="text-sm text-muted-foreground">Tidak ada mahasiswa cocok.</p>
+                  )}
+                </div>
+              )}
+            </>
+          )}
+        </div>
+
+        <div className="flex items-end gap-2">
+          <div className="w-28 space-y-1">
+            <Label className="text-xs">Durasi (hari)</Label>
+            <Input
+              type="number"
+              min={1}
+              max={60}
+              value={durasi}
+              onChange={(e) => setDurasi(Number(e.target.value) || 7)}
+            />
+          </div>
+          <Button className="flex-1" disabled={busy || !barcode || !terpilih} onClick={kirim}>
+            {busy ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <Send className="mr-2 h-4 w-4" />
+            )}
+            Kirim permintaan konfirmasi
+          </Button>
+        </div>
+        <p className="text-xs text-muted-foreground">
+          Mahasiswa terpilih akan diminta mengonfirmasi di perangkatnya (batal otomatis dalam{" "}
+          {KONFIRMASI_DETIK} detik).
+        </p>
+      </CardContent>
+    </Card>
+  );
+}
+
+// ---- Kartu: Menunggu konfirmasi mahasiswa (dengan hitung mundur) ----
+type MenungguRow = {
+  id: string;
+  tanggal_pengajuan: string;
+  buku: { judul: string | null } | null;
+  profil: { nama: string | null; nim: string | null } | null;
+};
+
+function MenungguKonfirmasiCard({ rows, loading }: { rows: MenungguRow[]; loading: boolean }) {
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base">Menunggu konfirmasi ({rows.length})</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-2">
+        {loading && <Loader2 className="h-4 w-4 animate-spin" />}
+        {!loading && rows.length === 0 && (
+          <p className="text-sm text-muted-foreground">Tidak ada permintaan menunggu.</p>
+        )}
+        {rows.map((p) => (
+          <KonfirmasiRow key={p.id} p={p} />
+        ))}
+      </CardContent>
+    </Card>
+  );
+}
+
+function KonfirmasiRow({ p }: { p: MenungguRow }) {
+  const [sisa, setSisa] = useState(KONFIRMASI_DETIK);
+  const dibatalkan = useRef(false);
+
+  useEffect(() => {
+    const hitung = () => {
+      const lewat = (Date.now() - new Date(p.tanggal_pengajuan).getTime()) / 1000;
+      return Math.max(0, Math.ceil(KONFIRMASI_DETIK - lewat));
+    };
+    setSisa(hitung());
+    const t = setInterval(() => {
+      const s = hitung();
+      setSisa(s);
+      if (s <= 0 && !dibatalkan.current) {
+        dibatalkan.current = true;
+        supabase
+          .rpc("batalkan_peminjaman_meja", {
+            _id: p.id,
+            _alasan: "Kedaluwarsa: tidak dikonfirmasi",
+          })
+          .then(() => undefined);
+      }
+    }, 500);
+    return () => clearInterval(t);
+  }, [p.id, p.tanggal_pengajuan]);
+
+  async function batalManual() {
+    dibatalkan.current = true;
+    await supabase.rpc("batalkan_peminjaman_meja", { _id: p.id, _alasan: "Dibatalkan petugas" });
+    toast.message("Permintaan dibatalkan.");
+  }
+
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border p-3">
+      <div className="text-sm">
+        <p className="font-medium">{p.buku?.judul}</p>
+        <p className="text-xs text-muted-foreground">
+          {p.profil?.nama} · {p.profil?.nim}
+        </p>
       </div>
-      <div className="space-y-2">
-        <Label>Scan barcode eksemplar</Label>
-        <BarcodeScannerInput autoFocus onScan={(b) => onSubmit(b, durasi)} />
+      <div className="flex items-center gap-2">
+        <Badge variant={sisa > 0 ? "secondary" : "destructive"}>
+          <Clock className="mr-1 h-3 w-3" />
+          {sisa > 0 ? `${sisa}s` : "habis"}
+        </Badge>
+        <Button size="sm" variant="ghost" onClick={batalManual}>
+          Batalkan
+        </Button>
       </div>
     </div>
   );

@@ -11,36 +11,7 @@ async function ensureStaff(context: { supabase: SupabaseClient<Database>; userId
   if (!data) throw new Error("Hanya petugas yang dapat melakukan aksi ini.");
 }
 
-// ============= MAHASISWA =============
-export const ajukanPeminjaman = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
-  .inputValidator((d) => z.object({ buku_id: z.string().uuid() }).parse(d))
-  .handler(async ({ data, context }) => {
-    // Cek kelayakan
-    const { data: layak } = await context.supabase.rpc("mahasiswa_layak_pinjam", {
-      _user_id: context.userId,
-    });
-    if (!layak) throw new Error("Anda memiliki denda belum lunas atau peminjaman terlambat.");
-
-    // Cek belum ada pengajuan aktif untuk buku ini
-    const { data: existing } = await context.supabase
-      .from("peminjaman")
-      .select("id")
-      .eq("user_id", context.userId)
-      .eq("buku_id", data.buku_id)
-      .in("status", ["menunggu", "disetujui", "dipinjam", "terlambat"]);
-    if (existing && existing.length)
-      throw new Error("Anda sudah memiliki pengajuan/pinjaman aktif untuk buku ini.");
-
-    const { data: row, error } = await context.supabase
-      .from("peminjaman")
-      .insert({ user_id: context.userId, buku_id: data.buku_id, status: "menunggu" })
-      .select("*")
-      .single();
-    if (error) throw new Error(error.message);
-    return row;
-  });
-
+// ============= MAHASISWA: RESERVASI =============
 export const buatReservasi = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d) => z.object({ buku_id: z.string().uuid() }).parse(d))
@@ -78,14 +49,17 @@ export const batalkanReservasi = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
-// ============= STAFF: PERSETUJUAN & PENGEMBALIAN =============
-export const setujuiPeminjaman = createServerFn({ method: "POST" })
+// ============= STAFF: PINJAM DI MEJA (scan) & PENGEMBALIAN =============
+// Admin memindai eksemplar & memilih mahasiswa → buat permintaan berstatus
+// 'menunggu' (eksemplar ditahan → 'dipesan'). Mahasiswa mengonfirmasi lewat
+// RPC konfirmasi_peminjaman (migrasi 20260721130000_pinjam_meja_konfirmasi).
+export const mulaiPeminjamanMeja = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d) =>
     z
       .object({
-        peminjaman_id: z.string().uuid(),
         barcode: z.string().min(1),
+        user_id: z.string().uuid(),
         durasi_hari: z.number().int().min(1).max(60).default(7),
       })
       .parse(d),
@@ -93,67 +67,58 @@ export const setujuiPeminjaman = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     await ensureStaff(context);
 
-    const { data: p, error: e1 } = await context.supabase
-      .from("peminjaman")
-      .select("*")
-      .eq("id", data.peminjaman_id)
+    // Mahasiswa harus ada & layak (tak ada denda belum lunas / terlambat).
+    const { data: profil } = await context.supabase
+      .from("profiles")
+      .select("id, nama")
+      .eq("id", data.user_id)
+      .maybeSingle();
+    if (!profil) throw new Error("Mahasiswa tidak ditemukan.");
+    const { data: layak } = await context.supabase.rpc("mahasiswa_layak_pinjam", {
+      _user_id: data.user_id,
+    });
+    if (!layak) throw new Error("Mahasiswa memiliki denda belum lunas atau peminjaman terlambat.");
+
+    // Cari eksemplar dari barcode.
+    const { data: eks, error: e1 } = await context.supabase
+      .from("eksemplar")
+      .select("id, buku_id, status")
+      .eq("barcode_value", data.barcode)
+      .is("deleted_at", null)
       .maybeSingle();
     if (e1) throw new Error(e1.message);
-    if (!p) throw new Error("Pengajuan tidak ditemukan.");
-    if (p.status !== "menunggu") throw new Error("Pengajuan sudah diproses.");
-
-    // Cari eksemplar berdasar barcode & buku_id
-    const { data: eks, error: e2 } = await context.supabase
-      .from("eksemplar")
-      .select("*")
-      .eq("barcode_value", data.barcode)
-      .maybeSingle();
-    if (e2) throw new Error(e2.message);
     if (!eks) throw new Error("Barcode eksemplar tidak dikenali.");
-    if (p.buku_id && eks.buku_id !== p.buku_id)
-      throw new Error("Eksemplar tidak sesuai dengan buku yang diajukan.");
-    if (eks.status !== "tersedia") throw new Error(`Eksemplar sedang berstatus "${eks.status}".`);
 
-    const now = new Date();
-    const tempo = new Date(now.getTime() + data.durasi_hari * 86400000);
-
-    const { error: e3 } = await context.supabase
-      .from("peminjaman")
-      .update({
-        status: "dipinjam",
-        eksemplar_id: eks.id,
-        buku_id: eks.buku_id,
-        disetujui_oleh: context.userId,
-        durasi_hari: data.durasi_hari,
-        tanggal_pinjam: now.toISOString(),
-        tanggal_jatuh_tempo: tempo.toISOString(),
-      })
-      .eq("id", p.id);
-    if (e3) throw new Error(e3.message);
-
-    const { error: e4 } = await context.supabase
+    // Tahan eksemplar secara atomik: tersedia → dipesan.
+    const { data: held, error: eHold } = await context.supabase
       .from("eksemplar")
-      .update({ status: "dipinjam" })
-      .eq("id", eks.id);
-    if (e4) throw new Error(e4.message);
+      .update({ status: "dipesan" })
+      .eq("id", eks.id)
+      .eq("status", "tersedia")
+      .select("id");
+    if (eHold) throw new Error(eHold.message);
+    if (!held || held.length === 0)
+      throw new Error(`Eksemplar sedang berstatus "${eks.status}", tidak bisa dipinjam.`);
 
-    return { ok: true };
-  });
-
-export const tolakPeminjaman = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
-  .inputValidator((d) =>
-    z.object({ peminjaman_id: z.string().uuid(), catatan: z.string().optional() }).parse(d),
-  )
-  .handler(async ({ data, context }) => {
-    await ensureStaff(context);
-    const { error } = await context.supabase
+    // Buat permintaan menunggu konfirmasi mahasiswa.
+    const { data: row, error: e2 } = await context.supabase
       .from("peminjaman")
-      .update({ status: "ditolak", catatan: data.catatan ?? null, disetujui_oleh: context.userId })
-      .eq("id", data.peminjaman_id)
-      .eq("status", "menunggu");
-    if (error) throw new Error(error.message);
-    return { ok: true };
+      .insert({
+        user_id: data.user_id,
+        buku_id: eks.buku_id,
+        eksemplar_id: eks.id,
+        status: "menunggu",
+        durasi_hari: data.durasi_hari,
+        disetujui_oleh: context.userId,
+      })
+      .select("id")
+      .single();
+    if (e2) {
+      // Lepas tahanan bila gagal membuat baris.
+      await context.supabase.from("eksemplar").update({ status: "tersedia" }).eq("id", eks.id);
+      throw new Error(e2.message);
+    }
+    return { ok: true, peminjaman_id: row.id, nama: profil.nama };
   });
 
 export const kembalikanBarcode = createServerFn({ method: "POST" })

@@ -98,6 +98,64 @@ export async function peminjamanStatus(token: string, bukuId: string): Promise<s
   return rows[0]?.status ?? null;
 }
 
+export async function eksemplarIdByBarcode(token: string, barcode: string): Promise<string | null> {
+  const res = await fetch(
+    `${SUPABASE_URL}/rest/v1/eksemplar?select=id&barcode_value=eq.${barcode}`,
+    { headers: h(token) },
+  );
+  return (await res.json())[0]?.id ?? null;
+}
+
+export async function profilIdByEmail(token: string, email: string): Promise<string | null> {
+  const res = await fetch(
+    `${SUPABASE_URL}/rest/v1/profiles?select=id&email=eq.${encodeURIComponent(email)}`,
+    { headers: h(token) },
+  );
+  return (await res.json())[0]?.id ?? null;
+}
+
+// Buat baris peminjaman 'menunggu' + tahan eksemplar (seperti mulaiPeminjamanMeja).
+export async function buatMenunggu(
+  adminToken: string,
+  opts: { bukuId: string; eksemplarId: string; userId: string; durasi?: number },
+): Promise<string> {
+  const ins = await fetch(`${SUPABASE_URL}/rest/v1/peminjaman`, {
+    method: "POST",
+    headers: h(adminToken, { Prefer: "return=representation" }),
+    body: JSON.stringify({
+      user_id: opts.userId,
+      buku_id: opts.bukuId,
+      eksemplar_id: opts.eksemplarId,
+      status: "menunggu",
+      durasi_hari: opts.durasi ?? 7,
+    }),
+  });
+  const rows = await ins.json();
+  if (!rows[0]?.id) throw new Error("Gagal buat menunggu: " + JSON.stringify(rows));
+  await fetch(`${SUPABASE_URL}/rest/v1/eksemplar?id=eq.${opts.eksemplarId}`, {
+    method: "PATCH",
+    headers: h(adminToken),
+    body: JSON.stringify({ status: "dipesan" }),
+  });
+  return rows[0].id as string;
+}
+
+// Panggil RPC via REST. Mengembalikan { status, body }.
+export async function callRpc(token: string, fn: string, args: Record<string, unknown>) {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/${fn}`, {
+    method: "POST",
+    headers: h(token),
+    body: JSON.stringify(args),
+  });
+  return { status: res.status, body: await res.text() };
+}
+
+// Apakah fungsi RPC sudah ada di DB (migrasi diterapkan)? 404 = belum ada.
+export async function rpcAda(token: string, fn: string, args: Record<string, unknown>) {
+  const { status } = await callRpc(token, fn, args);
+  return status !== 404;
+}
+
 export async function bukuByKode(token: string, kode: string) {
   const res = await fetch(
     `${SUPABASE_URL}/rest/v1/buku?select=id,kode_buku,judul&kode_buku=eq.${kode}`,

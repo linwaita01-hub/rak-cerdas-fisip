@@ -1,6 +1,7 @@
 import { createFileRoute, Outlet, redirect } from "@tanstack/react-router";
 import { supabase } from "@/integrations/supabase/client";
 import { RoleWatcher } from "@/components/RoleWatcher";
+import { KonfirmasiPinjamWatcher } from "@/components/KonfirmasiPinjamWatcher";
 
 export const Route = createFileRoute("/_authenticated")({
   ssr: false,
@@ -16,6 +17,7 @@ function AuthenticatedLayout() {
   return (
     <>
       <RoleWatcher />
+      <KonfirmasiPinjamWatcher />
       <Outlet />
     </>
   );
