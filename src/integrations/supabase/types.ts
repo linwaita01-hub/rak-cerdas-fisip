@@ -25,6 +25,7 @@ export type Database = {
           kategori: string | null
           kode_buku: string
           lokasi_rak: string | null
+          meta: Json
           penerbit: string | null
           pengarang: string | null
           sampul_path: string | null
@@ -41,6 +42,7 @@ export type Database = {
           kategori?: string | null
           kode_buku: string
           lokasi_rak?: string | null
+          meta?: Json
           penerbit?: string | null
           pengarang?: string | null
           sampul_path?: string | null
@@ -57,6 +59,7 @@ export type Database = {
           kategori?: string | null
           kode_buku?: string
           lokasi_rak?: string | null
+          meta?: Json
           penerbit?: string | null
           pengarang?: string | null
           sampul_path?: string | null

@@ -10,7 +10,10 @@ export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
       { title: "Peminjaman Buku Perpus UNLAM FISIP" },
-      { name: "description", content: "Sistem peminjaman buku Perpustakaan FISIP Universitas Lambung Mangkurat." },
+      {
+        name: "description",
+        content: "Sistem peminjaman buku Perpustakaan FISIP Universitas Lambung Mangkurat.",
+      },
     ],
   }),
 });
@@ -33,21 +36,36 @@ function Landing() {
             Pinjam buku perpustakaan lebih mudah & cepat
           </h2>
           <p className="mt-3 text-muted-foreground">
-            Ajukan peminjaman, pantau status, dan kembalikan dengan pindai barcode.
-            Terintegrasi untuk mahasiswa dan admin perpustakaan FISIP ULM.
+            Ajukan peminjaman, pantau status, dan kembalikan dengan pindai barcode. Terintegrasi
+            untuk mahasiswa dan admin perpustakaan FISIP ULM.
           </p>
           <div className="mt-6 flex flex-wrap justify-center gap-3">
             <Button asChild size="lg">
               <Link to="/auth">Masuk / Daftar</Link>
+            </Button>
+            <Button asChild size="lg" variant="outline">
+              <Link to="/katalog">Lihat Katalog</Link>
             </Button>
           </div>
         </div>
 
         <div className="grid w-full gap-4 sm:grid-cols-3">
           {[
-            { icon: BookOpen, title: "Katalog Lengkap", desc: "Cari buku berdasar judul, pengarang, atau kategori." },
-            { icon: ScanLine, title: "Scan Barcode", desc: "Persetujuan dan pengembalian cepat via scanner atau kamera." },
-            { icon: ShieldCheck, title: "Aman & Terkelola", desc: "Peran & izin diatur ketat sesuai kebijakan perpustakaan." },
+            {
+              icon: BookOpen,
+              title: "Katalog Lengkap",
+              desc: "Cari buku berdasar judul, pengarang, atau kategori.",
+            },
+            {
+              icon: ScanLine,
+              title: "Scan Barcode",
+              desc: "Persetujuan dan pengembalian cepat via scanner atau kamera.",
+            },
+            {
+              icon: ShieldCheck,
+              title: "Aman & Terkelola",
+              desc: "Peran & izin diatur ketat sesuai kebijakan perpustakaan.",
+            },
           ].map((f) => (
             <div key={f.title} className="rounded-xl border bg-card p-5 shadow-sm">
               <f.icon className="h-6 w-6 text-primary" />

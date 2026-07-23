@@ -9,6 +9,7 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as KatalogRouteImport } from './routes/katalog'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as IndexRouteImport } from './routes/index'
@@ -16,6 +17,11 @@ import { Route as AuthenticatedLengkapiProfilRouteImport } from './routes/_authe
 import { Route as AuthenticatedEditorBukuRouteImport } from './routes/_authenticated/editor-buku'
 import { Route as AuthenticatedAppRouteImport } from './routes/_authenticated/app'
 
+const KatalogRoute = KatalogRouteImport.update({
+  id: '/katalog',
+  path: '/katalog',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AuthRoute = AuthRouteImport.update({
   id: '/auth',
   path: '/auth',
@@ -50,6 +56,7 @@ const AuthenticatedAppRoute = AuthenticatedAppRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
+  '/katalog': typeof KatalogRoute
   '/app': typeof AuthenticatedAppRoute
   '/editor-buku': typeof AuthenticatedEditorBukuRoute
   '/lengkapi-profil': typeof AuthenticatedLengkapiProfilRoute
@@ -57,6 +64,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
+  '/katalog': typeof KatalogRoute
   '/app': typeof AuthenticatedAppRoute
   '/editor-buku': typeof AuthenticatedEditorBukuRoute
   '/lengkapi-profil': typeof AuthenticatedLengkapiProfilRoute
@@ -66,20 +74,28 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
   '/auth': typeof AuthRoute
+  '/katalog': typeof KatalogRoute
   '/_authenticated/app': typeof AuthenticatedAppRoute
   '/_authenticated/editor-buku': typeof AuthenticatedEditorBukuRoute
   '/_authenticated/lengkapi-profil': typeof AuthenticatedLengkapiProfilRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/auth' | '/app' | '/editor-buku' | '/lengkapi-profil'
+  fullPaths:
+    | '/'
+    | '/auth'
+    | '/katalog'
+    | '/app'
+    | '/editor-buku'
+    | '/lengkapi-profil'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/auth' | '/app' | '/editor-buku' | '/lengkapi-profil'
+  to: '/' | '/auth' | '/katalog' | '/app' | '/editor-buku' | '/lengkapi-profil'
   id:
     | '__root__'
     | '/'
     | '/_authenticated'
     | '/auth'
+    | '/katalog'
     | '/_authenticated/app'
     | '/_authenticated/editor-buku'
     | '/_authenticated/lengkapi-profil'
@@ -89,10 +105,18 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
   AuthRoute: typeof AuthRoute
+  KatalogRoute: typeof KatalogRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/katalog': {
+      id: '/katalog'
+      path: '/katalog'
+      fullPath: '/katalog'
+      preLoaderRoute: typeof KatalogRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/auth': {
       id: '/auth'
       path: '/auth'
@@ -157,6 +181,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
   AuthRoute: AuthRoute,
+  KatalogRoute: KatalogRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

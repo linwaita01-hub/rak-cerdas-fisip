@@ -15,10 +15,13 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Search, BookOpen, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { buatReservasi, batalkanReservasi } from "@/lib/perpus.functions";
 import { fmtIDR, fmtWITA, type Profile } from "@/hooks/useMe";
+import { BukuDetail } from "@/components/katalog/BukuDetail";
+import { SELECT_KATALOG, type BukuKatalog } from "@/lib/katalog";
 
 export function MahasiswaDashboard({ profile }: { profile: Profile | null }) {
   const kelayakan = useQuery({
@@ -69,15 +72,14 @@ function Katalog({ dapatPinjam }: { dapatPinjam: boolean }) {
   const reservasi = useServerFn(buatReservasi);
   const [search, setSearch] = useState("");
   const [kategori, setKategori] = useState("");
+  const [detail, setDetail] = useState<BukuKatalog | null>(null);
 
   const q = useQuery({
     queryKey: ["katalog", search, kategori],
     queryFn: async () => {
       let query = supabase
         .from("buku")
-        .select(
-          "id, judul, pengarang, kategori, kode_buku, penerbit, tahun_terbit, eksemplar(id,status)",
-        )
+        .select(SELECT_KATALOG)
         .is("deleted_at", null)
         .order("judul")
         .limit(60);
@@ -135,11 +137,18 @@ function Katalog({ dapatPinjam }: { dapatPinjam: boolean }) {
                   Kode: {b.kode_buku} · {b.penerbit ?? "—"}{" "}
                   {b.tahun_terbit ? `(${b.tahun_terbit})` : ""}
                 </p>
-                <div className="flex gap-2 pt-1">
+                <div className="flex flex-wrap items-center gap-2 pt-1">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setDetail(b as unknown as BukuKatalog)}
+                  >
+                    Detail
+                  </Button>
                   {bisaPinjam ? (
-                    <p className="text-xs text-muted-foreground">
-                      Tersedia — pinjam langsung di meja perpustakaan (petugas memindai buku).
-                    </p>
+                    <span className="text-xs text-muted-foreground">
+                      Tersedia — pinjam di meja perpustakaan.
+                    </span>
                   ) : (
                     <Button
                       size="sm"
@@ -168,6 +177,15 @@ function Katalog({ dapatPinjam }: { dapatPinjam: boolean }) {
           <p className="text-sm text-muted-foreground">Tidak ada buku ditemukan.</p>
         )}
       </div>
+
+      <Dialog open={!!detail} onOpenChange={(o) => !o && setDetail(null)}>
+        <DialogContent className="max-h-[85vh] max-w-2xl overflow-auto">
+          <DialogHeader>
+            <DialogTitle>{detail?.judul ?? "Detail buku"}</DialogTitle>
+          </DialogHeader>
+          {detail && <BukuDetail buku={detail} />}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
