@@ -83,7 +83,7 @@ export function KonfirmasiPinjamWatcher() {
       acting.current = true;
       setBusy(true);
       try {
-        await supabase.rpc("batalkan_peminjaman_meja", { _id: pending.id, _alasan: alasan });
+        await (supabase.rpc as any)("batalkan_peminjaman_meja", { _id: pending.id, _alasan: alasan });
         if (!diam) toast.message("Permintaan peminjaman dibatalkan.");
       } catch {
         /* diabaikan */
