@@ -572,7 +572,7 @@ function KonfirmasiRow({ p }: { p: MenungguRow }) {
 
   async function batalManual() {
     dibatalkan.current = true;
-    await supabase.rpc("batalkan_peminjaman_meja", { _id: p.id, _alasan: "Dibatalkan petugas" });
+    await (supabase.rpc as any)("batalkan_peminjaman_meja", { _id: p.id, _alasan: "Dibatalkan petugas" });
     toast.message("Permintaan dibatalkan.");
   }
 
