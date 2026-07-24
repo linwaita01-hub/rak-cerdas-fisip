@@ -343,8 +343,11 @@ export function HistoryButton({ bukuId, bukuJudul }: { bukuId: string; bukuJudul
 
   async function kembalikan(historyId: string) {
     if (!confirm("Kembalikan buku ke versi ini?")) return;
-    const { error } = await supabase.rpc("kembalikan_versi_buku", { _history_id: historyId });
-    if (error) return toast.error(error.message);
+    try {
+      await kembalikanVersiBuku({ data: { history_id: historyId } });
+    } catch (e) {
+      return toast.error(e instanceof Error ? e.message : "Gagal memulihkan versi.");
+    }
     toast.success("Versi dipulihkan.");
     qc.invalidateQueries({ queryKey: ["buku-list"] });
     qc.invalidateQueries({ queryKey: ["buku-history", bukuId] });
