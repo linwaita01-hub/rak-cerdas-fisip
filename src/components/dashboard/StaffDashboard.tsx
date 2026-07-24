@@ -560,8 +560,7 @@ function KonfirmasiRow({ p }: { p: MenungguRow }) {
       setSisa(s);
       if (s <= 0 && !dibatalkan.current) {
         dibatalkan.current = true;
-        supabase
-          .rpc("batalkan_peminjaman_meja", {
+        (supabase.rpc as any)("batalkan_peminjaman_meja", {
             _id: p.id,
             _alasan: "Kedaluwarsa: tidak dikonfirmasi",
           })
