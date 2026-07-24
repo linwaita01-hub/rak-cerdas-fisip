@@ -411,16 +411,14 @@ export const imporBukuMassal = createServerFn({ method: "POST" })
           skipped++;
           continue;
         }
-        const { error } = await supabaseAdmin
-          .from("buku")
+        const { error } = await (supabaseAdmin.from("buku") as any)
           .update({ ...payload, deleted_at: null })
           .eq("id", existingId);
         if (error) throw new Error(`Gagal update ${r.kode_buku}: ${error.message}`);
         bukuId = existingId;
         updated++;
       } else {
-        const { data: ins, error } = await supabaseAdmin
-          .from("buku")
+        const { data: ins, error } = await (supabaseAdmin.from("buku") as any)
           .insert(payload)
           .select("id")
           .single();
