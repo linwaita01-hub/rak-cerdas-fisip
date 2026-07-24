@@ -74,25 +74,17 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
   );
 }
 
+const SITE_URL = "https://rak-cerdas-fisip.lovable.app";
+const SITE_IMAGE = "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/ffe8b974-8c2a-47d2-86d0-c598e144da9e/id-preview-7d49e030--8d716ddb-2516-4ad4-8c7a-d1bfdc57be35.lovable.app-1784672728957.png";
+
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
   head: () => ({
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Peminjaman Buku Perpus UNLAM FISIP" },
-      {
-        name: "description",
-        content:
-          "Sistem peminjaman buku Perpustakaan FISIP Universitas Lambung Mangkurat — ajukan, setujui, dan kembalikan buku dengan barcode.",
-      },
-      { property: "og:title", content: "Peminjaman Buku Perpus UNLAM FISIP" },
-      {
-        property: "og:description",
-        content: "Sistem peminjaman buku Perpustakaan FISIP Universitas Lambung Mangkurat.",
-      },
       { property: "og:type", content: "website" },
       { property: "og:site_name", content: "Perpus FISIP ULM" },
-      { name: "twitter:card", content: "summary" },
+      { name: "twitter:card", content: "summary_large_image" },
       { name: "theme-color", content: "#7a1f1f" },
       { name: "mobile-web-app-capable", content: "yes" },
       { name: "apple-mobile-web-app-capable", content: "yes" },
@@ -109,12 +101,42 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       },
       { rel: "apple-touch-icon", href: "/apple-touch-icon.png" },
     ],
+    scripts: [
+      {
+        type: "application/ld+json",
+        children: JSON.stringify({
+          "@context": "https://schema.org",
+          "@graph": [
+            {
+              "@type": "Organization",
+              name: "Perpustakaan FISIP Universitas Lambung Mangkurat",
+              alternateName: "Perpus FISIP ULM",
+              url: SITE_URL,
+              logo: `${SITE_URL}/icon-512.png`,
+              parentOrganization: {
+                "@type": "CollegeOrUniversity",
+                name: "Universitas Lambung Mangkurat",
+              },
+            },
+            {
+              "@type": "WebSite",
+              name: "Peminjaman Buku Perpus UNLAM FISIP",
+              url: SITE_URL,
+              inLanguage: "id-ID",
+            },
+          ],
+        }),
+      },
+    ],
   }),
   shellComponent: RootShell,
   component: RootComponent,
   notFoundComponent: NotFoundComponent,
   errorComponent: ErrorComponent,
 });
+
+export { SITE_URL, SITE_IMAGE };
+
 
 function RootShell({ children }: { children: ReactNode }) {
   return (

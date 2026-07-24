@@ -946,12 +946,18 @@ function EksemplarPanel({
               </div>
             </div>
             <div className="flex gap-1">
-              <Button size="icon" variant="ghost" onClick={() => setPrinting([e])}>
+              <Button
+                size="icon"
+                variant="ghost"
+                aria-label={`Cetak label barcode eksemplar ${e.kode_eksemplar}`}
+                onClick={() => setPrinting([e])}
+              >
                 <Printer className="h-4 w-4" />
               </Button>
               <Button
                 size="icon"
                 variant="ghost"
+                aria-label={`Hapus eksemplar ${e.kode_eksemplar}`}
                 className="text-destructive"
                 onClick={() => onDelete(e.id)}
               >

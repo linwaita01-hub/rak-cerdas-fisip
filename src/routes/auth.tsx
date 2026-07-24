@@ -1,8 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
-import { seedDemoAccounts } from "@/lib/demo-seed.functions";
 import { BrandHeader } from "@/components/BrandHeader";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,30 +10,35 @@ import { Card, CardContent } from "@/components/ui/card";
 import { toast } from "sonner";
 import { Eye, EyeOff, Loader2 } from "lucide-react";
 
+const AUTH_URL = "https://rak-cerdas-fisip.lovable.app/auth";
+const AUTH_TITLE = "Masuk atau Daftar — Perpus FISIP ULM";
+const AUTH_DESC = "Masuk sebagai mahasiswa atau petugas Perpustakaan FISIP ULM, daftar akun mahasiswa baru, atau atur ulang sandi Anda.";
+
 export const Route = createFileRoute("/auth")({
   component: AuthPage,
   head: () => ({
-    meta: [{ title: "Masuk — Perpus FISIP ULM" }],
+    meta: [
+      { title: AUTH_TITLE },
+      { name: "description", content: AUTH_DESC },
+      { property: "og:title", content: AUTH_TITLE },
+      { property: "og:description", content: AUTH_DESC },
+      { property: "og:url", content: AUTH_URL },
+      { name: "twitter:title", content: AUTH_TITLE },
+      { name: "twitter:description", content: AUTH_DESC },
+      { name: "robots", content: "noindex,follow" },
+    ],
+    links: [{ rel: "canonical", href: AUTH_URL }],
   }),
 });
 
-// Seed akun demo sekali secara DIAM-DIAM (kredensial TIDAK ditampilkan di web).
-let demoSeeded = false;
-
 function AuthPage() {
   const navigate = useNavigate();
-  const seedDemo = useServerFn(seedDemoAccounts);
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
       if (data.session) navigate({ to: "/app" });
     });
   }, [navigate]);
-  useEffect(() => {
-    if (demoSeeded) return;
-    demoSeeded = true;
-    // Pastikan akun demo tersedia tanpa menampilkan email/sandi di UI.
-    seedDemo({}).catch(() => {});
-  }, [seedDemo]);
+
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-gradient-to-b from-secondary/40 to-background px-4 py-10">
@@ -56,7 +59,7 @@ function AuthPage() {
           </CardContent>
         </Card>
         <p className="text-center text-xs text-muted-foreground">
-          <Link to="/" className="hover:underline">← Kembali ke beranda</Link>
+          <Link to="/" className="hover:underline">← Kembali ke beranda Perpustakaan FISIP ULM</Link>
         </p>
       </div>
     </main>
