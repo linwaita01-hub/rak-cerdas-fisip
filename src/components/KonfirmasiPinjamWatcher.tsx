@@ -121,7 +121,7 @@ export function KonfirmasiPinjamWatcher() {
     acting.current = true;
     setBusy(true);
     try {
-      const { error } = await supabase.rpc("konfirmasi_peminjaman", { _id: pending.id });
+      const { error } = await (supabase.rpc as any)("konfirmasi_peminjaman", { _id: pending.id });
       if (error) throw new Error(error.message);
       toast.success("Peminjaman dikonfirmasi. Selamat membaca!");
       setPending(null);
