@@ -25,7 +25,7 @@ import { Badge } from "@/components/ui/badge";
 import { Loader2, Upload, History, RotateCcw, Trash2, Plus, Download } from "lucide-react";
 import { toast } from "sonner";
 import { parseExcelFile, eksporBukuKeExcel, type SheetPreview } from "@/lib/excel-import";
-import { imporBukuMassal } from "@/lib/perpus.functions";
+import { imporBukuMassal, pulihkanBuku, hapusPermanenBuku, kembalikanVersiBuku } from "@/lib/perpus.functions";
 import { fmtWITA } from "@/hooks/useMe";
 
 // Baris yang bisa diedit di grid pratinjau impor (kolom typed; `meta` menyimpan
