@@ -212,6 +212,12 @@ const bukuSchema = z.object({
   kategori: z.string().optional().nullable(),
   lokasi_rak: z.string().optional().nullable(),
   deskripsi: z.string().optional().nullable(),
+  sampul_path: z.string().optional().nullable(),
+  // Kolom lengkap (No. Inventaris, Editor, Klasifikasi, Subjek, Sumber, dll.)
+  // disimpan fleksibel di meta. Dikirim hanya bila ada isinya.
+  meta: z.record(z.string(), z.string()).optional().nullable(),
+  // Untuk buku baru: langsung buat sejumlah eksemplar.
+  jumlah_eksemplar: z.number().int().min(0).max(500).optional().nullable(),
 });
 
 export const simpanBuku = createServerFn({ method: "POST" })
@@ -219,17 +225,36 @@ export const simpanBuku = createServerFn({ method: "POST" })
   .inputValidator((d) => bukuSchema.parse(d))
   .handler(async ({ data, context }) => {
     await ensureStaff(context);
-    if (data.id) {
-      const { error } = await context.supabase.from("buku").update(data).eq("id", data.id);
+    const { id, jumlah_eksemplar, meta, ...rest } = data;
+    // Hanya sertakan meta bila terisi (agar tetap jalan sebelum migrasi kolom meta).
+    const payload = meta && Object.keys(meta).length > 0 ? { ...rest, meta } : { ...rest };
+
+    if (id) {
+      const { error } = await context.supabase.from("buku").update(payload).eq("id", id);
       if (error) throw new Error(error.message);
-      return { ok: true, id: data.id };
+      return { ok: true, id };
     }
     const { data: row, error } = await context.supabase
       .from("buku")
-      .insert(data)
+      .insert(payload)
       .select("id")
       .single();
     if (error) throw new Error(error.message);
+
+    // Buat eksemplar awal untuk buku baru.
+    if (jumlah_eksemplar && jumlah_eksemplar > 0) {
+      const eks = Array.from({ length: jumlah_eksemplar }, (_, i) => {
+        const kode = `${rest.kode_buku}-${String(i + 1).padStart(4, "0")}`;
+        return {
+          buku_id: row.id,
+          kode_eksemplar: kode,
+          barcode_value: kode,
+          status: "tersedia" as const,
+        };
+      });
+      const { error: eErr } = await context.supabase.from("eksemplar").insert(eks);
+      if (eErr) throw new Error("Buku tersimpan, tapi gagal membuat eksemplar: " + eErr.message);
+    }
     return { ok: true, id: row.id };
   });
 

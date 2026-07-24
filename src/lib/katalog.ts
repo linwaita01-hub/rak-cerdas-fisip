@@ -44,6 +44,11 @@ export const META_DIKENAL = [
   "bahasa",
   "jenis_koleksi",
   "kode_inventaris",
+  "kode_barcot",
+  "tanggal",
+  "sumber_perolehan",
+  "sumber_sumbangan",
+  "catatan",
   "foto",
 ];
 
@@ -67,6 +72,11 @@ export const KOLOM_KATALOG: { label: string; get: (b: BukuKatalog) => string | n
   { label: "Bahasa", get: (b) => m(b, "bahasa") },
   { label: "Jenis koleksi", get: (b) => m(b, "jenis_koleksi") },
   { label: "No. inventaris", get: (b) => m(b, "kode_inventaris") },
+  { label: "Kode barcot / eksemplar", get: (b) => m(b, "kode_barcot") },
+  { label: "Tanggal", get: (b) => m(b, "tanggal") },
+  { label: "Sumber perolehan", get: (b) => m(b, "sumber_perolehan") },
+  { label: "Sumber sumbangan", get: (b) => m(b, "sumber_sumbangan") },
+  { label: "Catatan", get: (b) => m(b, "catatan") },
   { label: "Lokasi rak", get: (b) => b.lokasi_rak },
   { label: "Deskripsi", get: (b) => b.deskripsi },
 ];

@@ -252,15 +252,17 @@ export async function parseExcelFile(file: File): Promise<{ sheets: SheetPreview
         // Batasi ke rentang wajar; kolom yang salah tak akan meledakkan eksemplar.
         jumlah_eksemplar: jml != null && jml >= 0 && jml <= 200 ? jml : 1,
       };
-      // Tangkap kolom tak-terpetakan → meta (tanpa mengurangi informasi).
+      // Tangkap SEMUA kolom tak-terpetakan → meta (tanpa mengurangi informasi),
+      // termasuk kolom yang tidak punya judul header tapi tetap berisi teks.
       const usedIdx = new Set(Object.values(columnMap));
       const meta: Record<string, string> = {};
-      for (let j = 0; j < effectiveHeader.length; j++) {
+      const maxCols = Math.max(effectiveHeader.length, r.length);
+      for (let j = 0; j < maxCols; j++) {
         if (usedIdx.has(j)) continue;
         const val = toStr(r[j]);
         if (val == null) continue;
-        const key = metaKey(effectiveHeader[j]);
-        if (key && !(key in meta)) meta[key] = val;
+        const key = metaKey(effectiveHeader[j] ?? "") ?? `kolom_${j + 1}`;
+        if (!(key in meta)) meta[key] = val;
       }
       if (Object.keys(meta).length) row.meta = meta;
 

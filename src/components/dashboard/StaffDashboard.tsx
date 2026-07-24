@@ -736,7 +736,7 @@ function TabInventaris() {
 
       {/* Dialog edit buku */}
       <Dialog open={!!editBuku} onOpenChange={(o) => !o && setEditBuku(null)}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle>{editBuku?.id ? "Ubah buku" : "Buku baru"}</DialogTitle>
           </DialogHeader>
@@ -803,74 +803,147 @@ function TabInventaris() {
   );
 }
 
+// Field yang disimpan ke kolom meta (bukan kolom typed tabel buku).
+const META_FIELD_KEYS = [
+  "tanggal",
+  "kode_inventaris",
+  "kode_barcot",
+  "pengarang_tambahan",
+  "editor",
+  "edisi",
+  "kata_kunci",
+  "tempat_terbit",
+  "deskripsi_fisik",
+  "klasifikasi",
+  "subjek",
+  "bahasa",
+  "sumber_perolehan",
+  "catatan",
+  "sumber_sumbangan",
+];
+
+type FieldDef = {
+  key: string;
+  label: string;
+  type?: "number" | "textarea";
+  full?: boolean;
+  required?: boolean;
+};
+const BUKU_FIELDS: FieldDef[] = [
+  { key: "kode_buku", label: "Kode buku", required: true },
+  { key: "kode_inventaris", label: "No. Inventaris" },
+  { key: "kode_barcot", label: "Kode Barcot / Eksemplar" },
+  { key: "tanggal", label: "Tanggal" },
+  { key: "judul", label: "Judul", full: true, required: true },
+  { key: "pengarang", label: "Pengarang" },
+  { key: "pengarang_tambahan", label: "Pengarang Tambahan" },
+  { key: "editor", label: "Editor" },
+  { key: "edisi", label: "Edisi, Cetakan" },
+  { key: "penerbit", label: "Nama Penerbit" },
+  { key: "tempat_terbit", label: "Tempat Terbit" },
+  { key: "tahun_terbit", label: "Tahun Terbit", type: "number" },
+  { key: "isbn", label: "ISBN / ISSN" },
+  { key: "klasifikasi", label: "Klasifikasi" },
+  { key: "lokasi_rak", label: "No. Panggil" },
+  { key: "subjek", label: "Subjek" },
+  { key: "bahasa", label: "Bahasa" },
+  { key: "deskripsi_fisik", label: "Deskripsi Fisik" },
+  { key: "sumber_perolehan", label: "Sumber Perolehan" },
+  { key: "sumber_sumbangan", label: "Sumber Sumbangan" },
+  { key: "kata_kunci", label: "Kata Kunci", full: true },
+  { key: "catatan", label: "Catatan", full: true, type: "textarea" },
+  { key: "deskripsi", label: "Deskripsi", full: true, type: "textarea" },
+  { key: "sampul_path", label: "Foto (URL sampul)", full: true },
+];
+
 function BukuForm({ initial, onSubmit }: { initial: any; onSubmit: (v: any) => Promise<void> }) {
-  const [v, setV] = useState({
-    id: initial.id,
-    kode_buku: initial.kode_buku ?? "",
-    judul: initial.judul ?? "",
-    pengarang: initial.pengarang ?? "",
-    penerbit: initial.penerbit ?? "",
-    tahun_terbit: initial.tahun_terbit ?? null,
-    isbn: initial.isbn ?? "",
-    kategori: initial.kategori ?? "",
-    lokasi_rak: initial.lokasi_rak ?? "",
-    deskripsi: initial.deskripsi ?? "",
+  const metaAwal = (initial.meta ?? {}) as Record<string, string>;
+  const [v, setV] = useState<Record<string, string>>(() => {
+    const base: Record<string, string> = {
+      kode_buku: initial.kode_buku ?? "",
+      judul: initial.judul ?? "",
+      pengarang: initial.pengarang ?? "",
+      penerbit: initial.penerbit ?? "",
+      tahun_terbit: initial.tahun_terbit != null ? String(initial.tahun_terbit) : "",
+      isbn: initial.isbn ?? "",
+      lokasi_rak: initial.lokasi_rak ?? "",
+      deskripsi: initial.deskripsi ?? "",
+      sampul_path: initial.sampul_path ?? "",
+      jumlah_eksemplar: "",
+    };
+    for (const k of META_FIELD_KEYS) base[k] = metaAwal[k] ?? "";
+    // Klasifikasi lama tersimpan di kolom kategori.
+    if (!base.klasifikasi && initial.kategori) base.klasifikasi = initial.kategori;
+    return base;
   });
   const [saving, setSaving] = useState(false);
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    setSaving(true);
+    try {
+      const meta: Record<string, string> = {};
+      for (const k of META_FIELD_KEYS) {
+        const val = (v[k] ?? "").trim();
+        if (val) meta[k] = val;
+      }
+      await onSubmit({
+        id: initial.id,
+        kode_buku: v.kode_buku.trim(),
+        judul: v.judul.trim(),
+        pengarang: v.pengarang || null,
+        penerbit: v.penerbit || null,
+        tahun_terbit: v.tahun_terbit ? Number(v.tahun_terbit) : null,
+        isbn: v.isbn || null,
+        // Klasifikasi juga disimpan ke kolom kategori agar filter/badge lama tetap jalan.
+        kategori: v.klasifikasi || null,
+        lokasi_rak: v.lokasi_rak || null,
+        deskripsi: v.deskripsi || null,
+        sampul_path: v.sampul_path || null,
+        meta: Object.keys(meta).length ? meta : undefined,
+        jumlah_eksemplar:
+          !initial.id && v.jumlah_eksemplar ? Number(v.jumlah_eksemplar) : undefined,
+      });
+    } finally {
+      setSaving(false);
+    }
+  }
+
   return (
-    <form
-      onSubmit={async (e) => {
-        e.preventDefault();
-        setSaving(true);
-        await onSubmit({ ...v, tahun_terbit: v.tahun_terbit ? Number(v.tahun_terbit) : null });
-        setSaving(false);
-      }}
-      className="grid gap-3 sm:grid-cols-2"
-    >
-      <div className="space-y-1">
-        <Label>Kode buku *</Label>
-        <Input
-          required
-          value={v.kode_buku}
-          onChange={(e) => setV({ ...v, kode_buku: e.target.value })}
-        />
-      </div>
-      <div className="space-y-1">
-        <Label>Kategori</Label>
-        <Input value={v.kategori} onChange={(e) => setV({ ...v, kategori: e.target.value })} />
-      </div>
-      <div className="space-y-1 sm:col-span-2">
-        <Label>Judul *</Label>
-        <Input required value={v.judul} onChange={(e) => setV({ ...v, judul: e.target.value })} />
-      </div>
-      <div className="space-y-1">
-        <Label>Pengarang</Label>
-        <Input value={v.pengarang} onChange={(e) => setV({ ...v, pengarang: e.target.value })} />
-      </div>
-      <div className="space-y-1">
-        <Label>Penerbit</Label>
-        <Input value={v.penerbit} onChange={(e) => setV({ ...v, penerbit: e.target.value })} />
-      </div>
-      <div className="space-y-1">
-        <Label>Tahun terbit</Label>
-        <Input
-          type="number"
-          value={v.tahun_terbit ?? ""}
-          onChange={(e) => setV({ ...v, tahun_terbit: e.target.value as any })}
-        />
-      </div>
-      <div className="space-y-1">
-        <Label>ISBN</Label>
-        <Input value={v.isbn} onChange={(e) => setV({ ...v, isbn: e.target.value })} />
-      </div>
-      <div className="space-y-1 sm:col-span-2">
-        <Label>Lokasi rak</Label>
-        <Input value={v.lokasi_rak} onChange={(e) => setV({ ...v, lokasi_rak: e.target.value })} />
-      </div>
-      <div className="space-y-1 sm:col-span-2">
-        <Label>Deskripsi</Label>
-        <Textarea value={v.deskripsi} onChange={(e) => setV({ ...v, deskripsi: e.target.value })} />
-      </div>
+    <form onSubmit={submit} className="grid max-h-[68vh] gap-3 overflow-y-auto pr-1 sm:grid-cols-2">
+      {BUKU_FIELDS.map((f) => (
+        <div key={f.key} className={f.full ? "space-y-1 sm:col-span-2" : "space-y-1"}>
+          <Label>
+            {f.label}
+            {f.required ? " *" : ""}
+          </Label>
+          {f.type === "textarea" ? (
+            <Textarea
+              value={v[f.key] ?? ""}
+              onChange={(e) => setV({ ...v, [f.key]: e.target.value })}
+            />
+          ) : (
+            <Input
+              type={f.type === "number" ? "number" : "text"}
+              required={f.required}
+              value={v[f.key] ?? ""}
+              onChange={(e) => setV({ ...v, [f.key]: e.target.value })}
+            />
+          )}
+        </div>
+      ))}
+      {!initial.id && (
+        <div className="space-y-1">
+          <Label>Jumlah eksemplar (dibuat otomatis)</Label>
+          <Input
+            type="number"
+            min={0}
+            max={500}
+            value={v.jumlah_eksemplar}
+            onChange={(e) => setV({ ...v, jumlah_eksemplar: e.target.value })}
+          />
+        </div>
+      )}
       <DialogFooter className="sm:col-span-2">
         <Button type="submit" disabled={saving}>
           {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Simpan
