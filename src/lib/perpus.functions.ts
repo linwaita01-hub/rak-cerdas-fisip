@@ -372,6 +372,40 @@ export const jalankanSweepTerlambat = createServerFn({ method: "POST" })
     return { diperiksa: a ?? 0, reservasi_kadaluarsa: b ?? 0 };
   });
 
+// ============= STAFF: TRASH / RIWAYAT (proxy ke RPC SECURITY DEFINER) =============
+export const pulihkanBuku = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => z.object({ id: z.string().uuid() }).parse(d))
+  .handler(async ({ data, context }) => {
+    await ensureStaff(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { error } = await supabaseAdmin.rpc("pulihkan_buku", { _buku_id: data.id });
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+export const hapusPermanenBuku = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => z.object({ id: z.string().uuid() }).parse(d))
+  .handler(async ({ data, context }) => {
+    await ensureStaff(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { error } = await supabaseAdmin.rpc("hapus_permanen_buku", { _buku_id: data.id });
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+export const kembalikanVersiBuku = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => z.object({ history_id: z.string().uuid() }).parse(d))
+  .handler(async ({ data, context }) => {
+    await ensureStaff(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { error } = await supabaseAdmin.rpc("kembalikan_versi_buku", { _history_id: data.history_id });
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
 // ============= STAFF: IMPOR MASSAL =============
 const imporRow = z.object({
   kode_buku: z.string().min(1),
@@ -436,16 +470,14 @@ export const imporBukuMassal = createServerFn({ method: "POST" })
           skipped++;
           continue;
         }
-        const { error } = await supabaseAdmin
-          .from("buku")
+        const { error } = await (supabaseAdmin.from("buku") as any)
           .update({ ...payload, deleted_at: null })
           .eq("id", existingId);
         if (error) throw new Error(`Gagal update ${r.kode_buku}: ${error.message}`);
         bukuId = existingId;
         updated++;
       } else {
-        const { data: ins, error } = await supabaseAdmin
-          .from("buku")
+        const { data: ins, error } = await (supabaseAdmin.from("buku") as any)
           .insert(payload)
           .select("id")
           .single();

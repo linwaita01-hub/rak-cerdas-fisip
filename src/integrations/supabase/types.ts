@@ -25,7 +25,6 @@ export type Database = {
           kategori: string | null
           kode_buku: string
           lokasi_rak: string | null
-          meta: Json
           penerbit: string | null
           pengarang: string | null
           sampul_path: string | null
@@ -42,7 +41,6 @@ export type Database = {
           kategori?: string | null
           kode_buku: string
           lokasi_rak?: string | null
-          meta?: Json
           penerbit?: string | null
           pengarang?: string | null
           sampul_path?: string | null
@@ -59,7 +57,6 @@ export type Database = {
           kategori?: string | null
           kode_buku?: string
           lokasi_rak?: string | null
-          meta?: Json
           penerbit?: string | null
           pengarang?: string | null
           sampul_path?: string | null
@@ -441,12 +438,6 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      batalkan_konfirmasi_kadaluarsa: { Args: never; Returns: number }
-      batalkan_peminjaman_meja: {
-        Args: { _id: string; _alasan?: string }
-        Returns: undefined
-      }
-      konfirmasi_peminjaman: { Args: { _id: string }; Returns: undefined }
       expire_reservasi_lewat: { Args: never; Returns: number }
       hapus_permanen_buku: { Args: { _buku_id: string }; Returns: undefined }
       has_role: {
