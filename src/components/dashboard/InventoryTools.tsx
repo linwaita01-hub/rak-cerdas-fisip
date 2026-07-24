@@ -435,16 +435,22 @@ export function TabSampah() {
   });
 
   async function pulihkan(id: string) {
-    const { error } = await supabase.rpc("pulihkan_buku", { _buku_id: id });
-    if (error) return toast.error(error.message);
+    try {
+      await pulihkanBuku({ data: { id } });
+    } catch (e) {
+      return toast.error(e instanceof Error ? e.message : "Gagal memulihkan.");
+    }
     toast.success("Dipulihkan.");
     qc.invalidateQueries({ queryKey: ["buku-sampah"] });
     qc.invalidateQueries({ queryKey: ["buku-list"] });
   }
   async function hapusPermanen(id: string) {
     if (!confirm("Hapus permanen? Tindakan ini tidak bisa dibatalkan.")) return;
-    const { error } = await supabase.rpc("hapus_permanen_buku", { _buku_id: id });
-    if (error) return toast.error(error.message);
+    try {
+      await hapusPermanenBuku({ data: { id } });
+    } catch (e) {
+      return toast.error(e instanceof Error ? e.message : "Gagal menghapus.");
+    }
     toast.success("Dihapus permanen.");
     qc.invalidateQueries({ queryKey: ["buku-sampah"] });
     qc.invalidateQueries({ queryKey: ["purge-log"] });
