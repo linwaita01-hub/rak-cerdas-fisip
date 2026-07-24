@@ -12,6 +12,7 @@ export type ImporRow = {
   lokasi_rak?: string | null;
   deskripsi?: string | null;
   jumlah_eksemplar?: number | null;
+  meta?: Record<string, string>;
   _sheet?: string;
   _row?: number;
   _error?: string;
@@ -68,6 +69,42 @@ function matchField(field: string, n: string, keys: string[]): boolean {
   // Kolom "JDL" = jumlah judul, bukan jumlah eksemplar → jangan dipetakan.
   if (field === "jumlah_eksemplar" && n.includes("jdl")) return false;
   return keys.some((k) => n === k || n.startsWith(k) || n.endsWith(k));
+}
+
+// Kolom yang tidak dipetakan ke field typed disimpan ke `meta` agar tidak ada
+// informasi yang hilang. Header yang dikenal (struktur "sheet 7 tina") dipetakan
+// ke kunci kanonik yang dipakai katalog (lihat katalog.ts META_DIKENAL); header
+// lain memakai versi ringkas dirinya sendiri.
+const META_SYN: Record<string, string[]> = {
+  pengarang_tambahan: ["pengarangtambahan"],
+  editor: ["editor"],
+  edisi: ["edisi", "edisicetakan"],
+  tempat_terbit: ["tempatterbit"],
+  klasifikasi: ["klasifikasi", "klass"],
+  no_panggil: ["nopanggil"],
+  subjek: ["subjek"],
+  bahasa: ["bahasa"],
+  jenis_koleksi: ["jeniskoleksi"],
+  kode_inventaris: ["kodeinventaris", "noinventaris"],
+  foto: ["fotobuku", "foto", "sampul", "gambar"],
+  bentuk_fisik: ["bentukfisik", "bentukfisikkoleksi", "bentukfisikkolkesi"],
+  deskripsi_fisik: ["deskripsifisik"],
+  kata_kunci: ["infodetailspesifik", "katakunci", "infodetail"],
+};
+
+function metaKey(hdr: string): string | null {
+  const n = norm(hdr);
+  if (!n) return null;
+  for (const [key, syns] of Object.entries(META_SYN)) {
+    if (syns.some((s) => n === s || n.startsWith(s))) return key;
+  }
+  const clean = hdr
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "")
+    .slice(0, 40);
+  return clean || null;
 }
 
 function findHeaderRow(rows: unknown[][]): { headerIdx: number; header: string[] } | null {
@@ -215,6 +252,18 @@ export async function parseExcelFile(file: File): Promise<{ sheets: SheetPreview
         // Batasi ke rentang wajar; kolom yang salah tak akan meledakkan eksemplar.
         jumlah_eksemplar: jml != null && jml >= 0 && jml <= 200 ? jml : 1,
       };
+      // Tangkap kolom tak-terpetakan → meta (tanpa mengurangi informasi).
+      const usedIdx = new Set(Object.values(columnMap));
+      const meta: Record<string, string> = {};
+      for (let j = 0; j < effectiveHeader.length; j++) {
+        if (usedIdx.has(j)) continue;
+        const val = toStr(r[j]);
+        if (val == null) continue;
+        const key = metaKey(effectiveHeader[j]);
+        if (key && !(key in meta)) meta[key] = val;
+      }
+      if (Object.keys(meta).length) row.meta = meta;
+
       if (!row.judul || !row.kode_buku) {
         row._error = "judul/kode kosong";
         errors++;
@@ -246,7 +295,11 @@ export function eksporBukuKeExcel(rows: unknown[], filename = "buku.xlsx") {
     kategori: b.kategori ?? "",
     lokasi_rak: b.lokasi_rak ?? "",
     deskripsi: b.deskripsi ?? "",
-    jumlah_eksemplar: Array.isArray(b.eksemplar) ? b.eksemplar.length : 0,
+    jumlah_eksemplar: Array.isArray(b.eksemplar)
+      ? b.eksemplar.length
+      : typeof b.jumlah_eksemplar === "number"
+        ? b.jumlah_eksemplar
+        : 0,
   }));
   const ws = XLSX.utils.json_to_sheet(data);
   const wb = XLSX.utils.book_new();
