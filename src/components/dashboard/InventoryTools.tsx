@@ -25,7 +25,7 @@ import { Badge } from "@/components/ui/badge";
 import { Loader2, Upload, History, RotateCcw, Trash2, Plus, Download } from "lucide-react";
 import { toast } from "sonner";
 import { parseExcelFile, eksporBukuKeExcel, type SheetPreview } from "@/lib/excel-import";
-import { imporBukuMassal } from "@/lib/perpus.functions";
+import { imporBukuMassal, pulihkanBuku, hapusPermanenBuku, kembalikanVersiBuku } from "@/lib/perpus.functions";
 import { fmtWITA } from "@/hooks/useMe";
 
 // Baris yang bisa diedit di grid pratinjau impor (kolom typed; `meta` menyimpan
@@ -343,8 +343,11 @@ export function HistoryButton({ bukuId, bukuJudul }: { bukuId: string; bukuJudul
 
   async function kembalikan(historyId: string) {
     if (!confirm("Kembalikan buku ke versi ini?")) return;
-    const { error } = await supabase.rpc("kembalikan_versi_buku", { _history_id: historyId });
-    if (error) return toast.error(error.message);
+    try {
+      await kembalikanVersiBuku({ data: { history_id: historyId } });
+    } catch (e) {
+      return toast.error(e instanceof Error ? e.message : "Gagal memulihkan versi.");
+    }
     toast.success("Versi dipulihkan.");
     qc.invalidateQueries({ queryKey: ["buku-list"] });
     qc.invalidateQueries({ queryKey: ["buku-history", bukuId] });
@@ -432,16 +435,22 @@ export function TabSampah() {
   });
 
   async function pulihkan(id: string) {
-    const { error } = await supabase.rpc("pulihkan_buku", { _buku_id: id });
-    if (error) return toast.error(error.message);
+    try {
+      await pulihkanBuku({ data: { id } });
+    } catch (e) {
+      return toast.error(e instanceof Error ? e.message : "Gagal memulihkan.");
+    }
     toast.success("Dipulihkan.");
     qc.invalidateQueries({ queryKey: ["buku-sampah"] });
     qc.invalidateQueries({ queryKey: ["buku-list"] });
   }
   async function hapusPermanen(id: string) {
     if (!confirm("Hapus permanen? Tindakan ini tidak bisa dibatalkan.")) return;
-    const { error } = await supabase.rpc("hapus_permanen_buku", { _buku_id: id });
-    if (error) return toast.error(error.message);
+    try {
+      await hapusPermanenBuku({ data: { id } });
+    } catch (e) {
+      return toast.error(e instanceof Error ? e.message : "Gagal menghapus.");
+    }
     toast.success("Dihapus permanen.");
     qc.invalidateQueries({ queryKey: ["buku-sampah"] });
     qc.invalidateQueries({ queryKey: ["purge-log"] });
