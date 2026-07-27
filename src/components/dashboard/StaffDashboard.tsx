@@ -52,6 +52,7 @@ import { Barcode } from "@/components/Barcode";
 import { BarcodeScannerInput } from "@/components/BarcodeScannerInput";
 import { fmtIDR, fmtWITA, useMe } from "@/hooks/useMe";
 import { AdminSementaraPanel } from "@/components/dashboard/AdminSementaraPanel";
+import { FotoField } from "@/components/katalog/FotoField";
 import {
   mulaiPeminjamanMeja,
   kembalikanBarcode,
@@ -916,7 +917,13 @@ function BukuForm({ initial, onSubmit }: { initial: any; onSubmit: (v: any) => P
             {f.label}
             {f.required ? " *" : ""}
           </Label>
-          {f.type === "textarea" ? (
+          {f.key === "sampul_path" ? (
+            <FotoField
+              value={v.sampul_path ?? ""}
+              onChange={(val) => setV({ ...v, sampul_path: val })}
+              kodeBuku={v.kode_buku}
+            />
+          ) : f.type === "textarea" ? (
             <Textarea
               value={v[f.key] ?? ""}
               onChange={(e) => setV({ ...v, [f.key]: e.target.value })}
