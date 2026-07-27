@@ -14,6 +14,7 @@ import { Route as KatalogRouteImport } from './routes/katalog'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as BlogManfaatSistemPerpustakaanDigitalRouteImport } from './routes/blog.manfaat-sistem-perpustakaan-digital'
 import { Route as AuthenticatedLengkapiProfilRouteImport } from './routes/_authenticated/lengkapi-profil'
 import { Route as AuthenticatedEditorBukuRouteImport } from './routes/_authenticated/editor-buku'
 import { Route as AuthenticatedAppRouteImport } from './routes/_authenticated/app'
@@ -42,6 +43,12 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const BlogManfaatSistemPerpustakaanDigitalRoute =
+  BlogManfaatSistemPerpustakaanDigitalRouteImport.update({
+    id: '/blog/manfaat-sistem-perpustakaan-digital',
+    path: '/blog/manfaat-sistem-perpustakaan-digital',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const AuthenticatedLengkapiProfilRoute =
   AuthenticatedLengkapiProfilRouteImport.update({
     id: '/lengkapi-profil',
@@ -67,6 +74,7 @@ export interface FileRoutesByFullPath {
   '/app': typeof AuthenticatedAppRoute
   '/editor-buku': typeof AuthenticatedEditorBukuRoute
   '/lengkapi-profil': typeof AuthenticatedLengkapiProfilRoute
+  '/blog/manfaat-sistem-perpustakaan-digital': typeof BlogManfaatSistemPerpustakaanDigitalRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -76,6 +84,7 @@ export interface FileRoutesByTo {
   '/app': typeof AuthenticatedAppRoute
   '/editor-buku': typeof AuthenticatedEditorBukuRoute
   '/lengkapi-profil': typeof AuthenticatedLengkapiProfilRoute
+  '/blog/manfaat-sistem-perpustakaan-digital': typeof BlogManfaatSistemPerpustakaanDigitalRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -87,6 +96,7 @@ export interface FileRoutesById {
   '/_authenticated/app': typeof AuthenticatedAppRoute
   '/_authenticated/editor-buku': typeof AuthenticatedEditorBukuRoute
   '/_authenticated/lengkapi-profil': typeof AuthenticatedLengkapiProfilRoute
+  '/blog/manfaat-sistem-perpustakaan-digital': typeof BlogManfaatSistemPerpustakaanDigitalRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -98,6 +108,7 @@ export interface FileRouteTypes {
     | '/app'
     | '/editor-buku'
     | '/lengkapi-profil'
+    | '/blog/manfaat-sistem-perpustakaan-digital'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -107,6 +118,7 @@ export interface FileRouteTypes {
     | '/app'
     | '/editor-buku'
     | '/lengkapi-profil'
+    | '/blog/manfaat-sistem-perpustakaan-digital'
   id:
     | '__root__'
     | '/'
@@ -117,6 +129,7 @@ export interface FileRouteTypes {
     | '/_authenticated/app'
     | '/_authenticated/editor-buku'
     | '/_authenticated/lengkapi-profil'
+    | '/blog/manfaat-sistem-perpustakaan-digital'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -125,6 +138,7 @@ export interface RootRouteChildren {
   AuthRoute: typeof AuthRoute
   KatalogRoute: typeof KatalogRoute
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
+  BlogManfaatSistemPerpustakaanDigitalRoute: typeof BlogManfaatSistemPerpustakaanDigitalRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -162,6 +176,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/blog/manfaat-sistem-perpustakaan-digital': {
+      id: '/blog/manfaat-sistem-perpustakaan-digital'
+      path: '/blog/manfaat-sistem-perpustakaan-digital'
+      fullPath: '/blog/manfaat-sistem-perpustakaan-digital'
+      preLoaderRoute: typeof BlogManfaatSistemPerpustakaanDigitalRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_authenticated/lengkapi-profil': {
@@ -209,17 +230,9 @@ const rootRouteChildren: RootRouteChildren = {
   AuthRoute: AuthRoute,
   KatalogRoute: KatalogRoute,
   SitemapDotxmlRoute: SitemapDotxmlRoute,
+  BlogManfaatSistemPerpustakaanDigitalRoute:
+    BlogManfaatSistemPerpustakaanDigitalRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}
