@@ -40,6 +40,7 @@ import {
   Send,
 } from "lucide-react";
 import { KONFIRMASI_DETIK } from "@/lib/pinjam";
+import { useGlobalScan } from "@/hooks/useGlobalScan";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   ExportBukuButton,
@@ -381,6 +382,9 @@ function PinjamMejaCard() {
     const b = data.buku as unknown as { judul: string | null; kode_buku: string | null } | null;
     setBuku({ judul: b?.judul ?? "—", kode: b?.kode_buku ?? "—", status: data.status });
   }
+
+  // Tangkap scan global (scanner mengetik walau kolom tak difokuskan).
+  useGlobalScan(onScan);
 
   const hasil = useQuery({
     queryKey: ["cari-peminjam", cari],
