@@ -566,10 +566,9 @@ function KonfirmasiRow({ p }: { p: MenungguRow }) {
       if (s <= 0 && !dibatalkan.current) {
         dibatalkan.current = true;
         (supabase.rpc as any)("batalkan_peminjaman_meja", {
-            _id: p.id,
-            _alasan: "Kedaluwarsa: tidak dikonfirmasi",
-          })
-          .then(() => undefined);
+          _id: p.id,
+          _alasan: "Kedaluwarsa: tidak dikonfirmasi",
+        }).then(() => undefined);
       }
     }, 500);
     return () => clearInterval(t);
@@ -577,7 +576,10 @@ function KonfirmasiRow({ p }: { p: MenungguRow }) {
 
   async function batalManual() {
     dibatalkan.current = true;
-    await (supabase.rpc as any)("batalkan_peminjaman_meja", { _id: p.id, _alasan: "Dibatalkan petugas" });
+    await (supabase.rpc as any)("batalkan_peminjaman_meja", {
+      _id: p.id,
+      _alasan: "Dibatalkan petugas",
+    });
     toast.message("Permintaan dibatalkan.");
   }
 
@@ -694,7 +696,8 @@ function TabInventaris() {
                 <div className="flex-1">
                   <CardTitle className="line-clamp-2 text-base">{b.judul}</CardTitle>
                   <p className="text-xs text-muted-foreground">
-                    {b.pengarang ?? "—"} · {b.kode_buku}
+                    {b.pengarang ?? "—"}
+                    {b.meta?.kode_inventaris ? ` · ${b.meta.kode_inventaris}` : ""}
                   </p>
                 </div>
               </CardHeader>
@@ -834,7 +837,7 @@ type FieldDef = {
   required?: boolean;
 };
 const BUKU_FIELDS: FieldDef[] = [
-  { key: "kode_buku", label: "Kode buku", required: true },
+  // kode_buku SENGAJA tidak ditampilkan: dibuat otomatis oleh server.
   { key: "kode_inventaris", label: "No. Inventaris" },
   { key: "kode_barcot", label: "Kode Barcot / Eksemplar" },
   { key: "tanggal", label: "Tanggal" },
@@ -893,7 +896,8 @@ function BukuForm({ initial, onSubmit }: { initial: any; onSubmit: (v: any) => P
       }
       await onSubmit({
         id: initial.id,
-        kode_buku: v.kode_buku.trim(),
+        // kode_buku tidak dikirim: dibuat otomatis oleh server saat buku baru,
+        // dan dipertahankan apa adanya saat mengubah buku.
         judul: v.judul.trim(),
         pengarang: v.pengarang || null,
         penerbit: v.penerbit || null,

@@ -53,7 +53,8 @@ export const META_DIKENAL = [
 ];
 
 export const KOLOM_KATALOG: { label: string; get: (b: BukuKatalog) => string | null }[] = [
-  { label: "Kode buku", get: (b) => b.kode_buku },
+  // "Kode buku" tidak ditampilkan: kode internal otomatis. Yang bermakna bagi
+  // pengguna adalah No. Inventaris / Kode Barcot (ada di baris bawah).
   { label: "Judul", get: (b) => b.judul },
   { label: "Pengarang", get: (b) => b.pengarang },
   { label: "Pengarang tambahan", get: (b) => m(b, "pengarang_tambahan") },

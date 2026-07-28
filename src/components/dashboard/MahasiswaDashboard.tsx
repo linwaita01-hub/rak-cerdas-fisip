@@ -134,8 +134,7 @@ function Katalog({ dapatPinjam }: { dapatPinjam: boolean }) {
                   </Badge>
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  Kode: {b.kode_buku} · {b.penerbit ?? "—"}{" "}
-                  {b.tahun_terbit ? `(${b.tahun_terbit})` : ""}
+                  {b.penerbit ?? "—"} {b.tahun_terbit ? `(${b.tahun_terbit})` : ""}
                 </p>
                 <div className="flex flex-wrap items-center gap-2 pt-1">
                   <Button

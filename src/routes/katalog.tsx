@@ -110,7 +110,7 @@ function KatalogPage() {
                     <p className="line-clamp-2 font-medium">{b.judul ?? "—"}</p>
                     <p className="truncate text-xs text-muted-foreground">{b.pengarang ?? "—"}</p>
                     <p className="mt-1 truncate text-xs text-muted-foreground">
-                      {b.kode_buku ?? ""}
+                      {(b.meta as Record<string, string> | null)?.kode_inventaris ?? ""}
                     </p>
                     <div className="mt-2 flex items-center gap-2">
                       <Badge

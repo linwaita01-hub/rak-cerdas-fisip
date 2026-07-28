@@ -201,9 +201,18 @@ export const bebaskanDenda = createServerFn({ method: "POST" })
   });
 
 // ============= STAFF: INVENTARIS =============
+// Kode buku dibuat otomatis (tersembunyi dari petugas). Pola: BK-YYMM-XXXXX.
+function buatKodeBuku(): string {
+  const d = new Date();
+  const yymm = String(d.getFullYear()).slice(2) + String(d.getMonth() + 1).padStart(2, "0");
+  const acak = Math.random().toString(36).slice(2, 7).toUpperCase();
+  return `BK-${yymm}-${acak}`;
+}
+
 const bukuSchema = z.object({
   id: z.string().uuid().optional(),
-  kode_buku: z.string().min(1),
+  // Opsional: bila kosong, server membuatnya otomatis.
+  kode_buku: z.string().min(1).optional().nullable(),
   judul: z.string().min(1),
   pengarang: z.string().optional().nullable(),
   penerbit: z.string().optional().nullable(),
@@ -225,26 +234,44 @@ export const simpanBuku = createServerFn({ method: "POST" })
   .inputValidator((d) => bukuSchema.parse(d))
   .handler(async ({ data, context }) => {
     await ensureStaff(context);
-    const { id, jumlah_eksemplar, meta, ...rest } = data;
+    const { id, jumlah_eksemplar, meta, kode_buku, ...sisa } = data;
+    const rest = { ...sisa };
     // Hanya sertakan meta bila terisi (agar tetap jalan sebelum migrasi kolom meta).
-    const payload = meta && Object.keys(meta).length > 0 ? { ...rest, meta } : { ...rest };
+    const dasar = meta && Object.keys(meta).length > 0 ? { ...rest, meta } : { ...rest };
 
     if (id) {
+      // Saat mengubah: jangan menimpa kode_buku bila tidak dikirim.
+      const payload = kode_buku ? { ...dasar, kode_buku } : dasar;
       const { error } = await context.supabase.from("buku").update(payload).eq("id", id);
       if (error) throw new Error(error.message);
       return { ok: true, id };
     }
-    const { data: row, error } = await context.supabase
-      .from("buku")
-      .insert(payload)
-      .select("id")
-      .single();
-    if (error) throw new Error(error.message);
+
+    // Buat baru: kode_buku dibuat otomatis bila tidak dikirim; ulangi bila
+    // kebetulan bentrok dengan kode yang sudah ada (unique violation 23505).
+    let kodeFinal = kode_buku?.trim() || buatKodeBuku();
+    let row: { id: string } | null = null;
+    for (let coba = 0; coba < 5; coba++) {
+      const res = await context.supabase
+        .from("buku")
+        .insert({ ...dasar, kode_buku: kodeFinal })
+        .select("id")
+        .single();
+      if (!res.error) {
+        row = res.data;
+        break;
+      }
+      const bentrok = res.error.code === "23505";
+      if (!bentrok) throw new Error(res.error.message);
+      if (kode_buku) throw new Error(`Kode buku "${kodeFinal}" sudah dipakai.`);
+      kodeFinal = buatKodeBuku(); // hanya kode otomatis yang boleh diganti
+    }
+    if (!row) throw new Error("Gagal membuat kode buku unik. Coba lagi.");
 
     // Buat eksemplar awal untuk buku baru.
     if (jumlah_eksemplar && jumlah_eksemplar > 0) {
       const eks = Array.from({ length: jumlah_eksemplar }, (_, i) => {
-        const kode = `${rest.kode_buku}-${String(i + 1).padStart(4, "0")}`;
+        const kode = `${kodeFinal}-${String(i + 1).padStart(4, "0")}`;
         return {
           buku_id: row.id,
           kode_eksemplar: kode,
@@ -401,7 +428,9 @@ export const kembalikanVersiBuku = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     await ensureStaff(context);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { error } = await supabaseAdmin.rpc("kembalikan_versi_buku", { _history_id: data.history_id });
+    const { error } = await supabaseAdmin.rpc("kembalikan_versi_buku", {
+      _history_id: data.history_id,
+    });
     if (error) throw new Error(error.message);
     return { ok: true };
   });
