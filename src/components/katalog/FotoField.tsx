@@ -22,7 +22,7 @@ export function FotoField({
 }) {
   const fileRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
-  const src = resolveSrc(value);
+  const src = useSampul(value);
 
   async function unggah(file: File) {
     if (!file.type.startsWith("image/")) {
