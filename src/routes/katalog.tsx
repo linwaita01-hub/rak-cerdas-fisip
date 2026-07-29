@@ -96,16 +96,12 @@ function KatalogPage() {
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {q.data?.map((b) => {
             const { tersedia, total } = ketersediaan(b);
-            const foto = fotoUrl(b);
+            const foto = fotoRaw(b);
             return (
               <Card key={b.id} className="overflow-hidden transition hover:shadow-md">
                 <CardContent className="flex gap-3 p-3">
                   <div className="flex h-24 w-16 shrink-0 items-center justify-center overflow-hidden rounded border bg-muted">
-                    {foto ? (
-                      <img src={foto} alt={b.judul ?? ""} className="h-full w-full object-cover" />
-                    ) : (
-                      <BookOpen className="h-6 w-6 text-muted-foreground" />
-                    )}
+                    <SampulImg raw={foto} alt={b.judul ?? ""} className="h-full w-full object-cover" />
                   </div>
                   <div className="min-w-0 flex-1">
                     <p className="line-clamp-2 font-medium">{b.judul ?? "—"}</p>
