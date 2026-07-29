@@ -1,0 +1,1 @@
+ALTER TABLE public.buku ADD COLUMN IF NOT EXISTS meta jsonb;
