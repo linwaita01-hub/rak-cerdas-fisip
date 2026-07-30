@@ -46,18 +46,13 @@ function AuthPage() {
         <BrandHeader />
         <Card className="border-primary/10 shadow-lg">
           <CardContent className="pt-6">
-            <Tabs defaultValue="login" className="w-full">
-              <TabsList className="grid w-full grid-cols-3">
-                <TabsTrigger value="login">Masuk</TabsTrigger>
-                <TabsTrigger value="register">Daftar</TabsTrigger>
-                <TabsTrigger value="forgot">Lupa</TabsTrigger>
-              </TabsList>
-              <TabsContent value="login"><LoginForm /></TabsContent>
-              <TabsContent value="register"><RegisterForm /></TabsContent>
-              <TabsContent value="forgot"><ForgotForm /></TabsContent>
-            </Tabs>
+            <LoginForm />
+            <p className="mt-4 text-xs text-muted-foreground">
+              Akun dibuatkan oleh petugas perpustakaan. Hubungi petugas jika Anda belum memiliki akun atau lupa sandi.
+            </p>
           </CardContent>
         </Card>
+
         <p className="text-center text-xs text-muted-foreground">
           <Link to="/" className="hover:underline">← Kembali ke beranda Perpustakaan FISIP ULM</Link>
         </p>
