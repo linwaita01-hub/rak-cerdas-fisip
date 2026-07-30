@@ -507,3 +507,62 @@ export const imporBukuMassal = createServerFn({ method: "POST" })
 
     return { inserted, updated, skipped, eksemplarDibuat };
   });
+
+// ── Tambah mahasiswa cepat dari dasbor petugas ──────────────────────────────
+// Membuat akun auth + profil mahasiswa (nama, NIM, prodi). Hanya staf.
+export const tambahMahasiswa = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) =>
+    z
+      .object({
+        nama: z.string().trim().min(3),
+        nim: z.string().trim().regex(/^\d{6,15}$/),
+        prodi: z.string().trim().min(2),
+        email: z.string().trim().email().optional().or(z.literal("")),
+      })
+      .parse(d),
+  )
+  .handler(async ({ data, context }) => {
+    const { data: staf, error: sErr } = await context.supabase.rpc("is_staff", {
+      _user_id: context.userId,
+    });
+    if (sErr) throw new Error(sErr.message);
+    if (!staf) throw new Error("Hanya petugas yang dapat menambah mahasiswa.");
+
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    const { data: dup } = await supabaseAdmin
+      .from("profiles")
+      .select("id")
+      .eq("nim", data.nim)
+      .maybeSingle();
+    if (dup) throw new Error(`NIM ${data.nim} sudah terdaftar.`);
+
+    const email = data.email?.trim() || `${data.nim}@mhs.fisip.ulm.ac.id`;
+    const sandi = `Fisip-${data.nim}-${Math.random().toString(36).slice(2, 8)}`;
+
+    const { data: created, error: cErr } = await supabaseAdmin.auth.admin.createUser({
+      email,
+      password: sandi,
+      email_confirm: true,
+      user_metadata: { nama: data.nama },
+    });
+    if (cErr || !created.user) throw new Error(cErr?.message ?? "Gagal membuat akun.");
+
+    const { error: pErr } = await supabaseAdmin
+      .from("profiles")
+      .update({
+        nama: data.nama,
+        nim: data.nim,
+        prodi: data.prodi,
+        email,
+        is_profile_completed: true,
+      })
+      .eq("id", created.user.id);
+    if (pErr) {
+      await supabaseAdmin.auth.admin.deleteUser(created.user.id);
+      throw new Error(pErr.message);
+    }
+
+    return { id: created.user.id, nama: data.nama, nim: data.nim, prodi: data.prodi, email, sandi };
+  });
