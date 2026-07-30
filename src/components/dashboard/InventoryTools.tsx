@@ -20,12 +20,11 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Upload, History, RotateCcw, Trash2, Plus, Download } from "lucide-react";
+import { Loader2, Upload, History, RotateCcw, Plus, Download } from "lucide-react";
 import { toast } from "sonner";
 import { parseExcelFile, eksporBukuKeExcel, type SheetPreview } from "@/lib/excel-import";
-import { imporBukuMassal, pulihkanBuku, hapusPermanenBuku, kembalikanVersiBuku } from "@/lib/perpus.functions";
+import { imporBukuMassal, kembalikanVersiBuku } from "@/lib/perpus.functions";
 import { fmtWITA } from "@/hooks/useMe";
 
 // Baris yang bisa diedit di grid pratinjau impor (kolom typed; `meta` menyimpan
@@ -404,133 +403,5 @@ export function HistoryButton({ bukuId, bukuJudul }: { bukuId: string; bukuJudul
         </DialogContent>
       </Dialog>
     </>
-  );
-}
-
-// ============= TAB TEMPAT SAMPAH =============
-export function TabSampah() {
-  const qc = useQueryClient();
-  const q = useQuery({
-    queryKey: ["buku-sampah"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("buku")
-        .select("*")
-        .not("deleted_at", "is", null)
-        .order("deleted_at", { ascending: false });
-      if (error) throw error;
-      return data ?? [];
-    },
-  });
-  const purge = useQuery({
-    queryKey: ["purge-log"],
-    queryFn: async () => {
-      const { data } = await supabase
-        .from("purge_log")
-        .select("*")
-        .order("created_at", { ascending: false })
-        .limit(10);
-      return data ?? [];
-    },
-  });
-
-  async function pulihkan(id: string) {
-    try {
-      await pulihkanBuku({ data: { id } });
-    } catch (e) {
-      return toast.error(e instanceof Error ? e.message : "Gagal memulihkan.");
-    }
-    toast.success("Dipulihkan.");
-    qc.invalidateQueries({ queryKey: ["buku-sampah"] });
-    qc.invalidateQueries({ queryKey: ["buku-list"] });
-  }
-  async function hapusPermanen(id: string) {
-    if (!confirm("Hapus permanen? Tindakan ini tidak bisa dibatalkan.")) return;
-    try {
-      await hapusPermanenBuku({ data: { id } });
-    } catch (e) {
-      return toast.error(e instanceof Error ? e.message : "Gagal menghapus.");
-    }
-    toast.success("Dihapus permanen.");
-    qc.invalidateQueries({ queryKey: ["buku-sampah"] });
-    qc.invalidateQueries({ queryKey: ["purge-log"] });
-  }
-
-  return (
-    <div className="space-y-4">
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Tempat sampah ({q.data?.length ?? 0})</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="mb-3 text-xs text-muted-foreground">
-            Buku yang dihapus akan tersimpan di sini. Sistem menghapus permanen otomatis setelah
-            batas retensi terlewati.
-          </p>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Kode</TableHead>
-                <TableHead>Judul</TableHead>
-                <TableHead>Dihapus pada</TableHead>
-                <TableHead className="text-right">Aksi</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {q.data?.map((b: any) => (
-                <TableRow key={b.id}>
-                  <TableCell className="font-mono text-xs">{b.kode_buku}</TableCell>
-                  <TableCell className="text-sm">{b.judul}</TableCell>
-                  <TableCell className="text-xs">{fmtWITA(b.deleted_at)}</TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex justify-end gap-2">
-                      <Button size="sm" variant="outline" onClick={() => pulihkan(b.id)}>
-                        <RotateCcw className="mr-1 h-3 w-3" />
-                        Pulihkan
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        className="text-destructive"
-                        onClick={() => hapusPermanen(b.id)}
-                      >
-                        <Trash2 className="mr-1 h-3 w-3" />
-                        Hapus permanen
-                      </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
-              {!q.data?.length && (
-                <TableRow>
-                  <TableCell colSpan={4} className="text-center text-sm text-muted-foreground">
-                    Kosong.
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Log pembersihan otomatis</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {purge.data?.length ? (
-            <ul className="space-y-1 text-xs">
-              {purge.data.map((l: any) => (
-                <li key={l.id}>
-                  {fmtWITA(l.created_at)} — {l.entitas}: <b>{l.jumlah}</b> baris
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p className="text-sm text-muted-foreground">Belum ada log.</p>
-          )}
-        </CardContent>
-      </Card>
-    </div>
   );
 }

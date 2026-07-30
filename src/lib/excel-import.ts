@@ -198,11 +198,21 @@ export type SheetPreview = {
   errorCount: number;
 };
 
+// Impor hanya menerima sheet dengan nama persis "FISIP Lengkap (Tina)"
+// (spasi & tanda kurung fleksibel, tak peduli huruf besar/kecil).
+const NAMA_SHEET_TINA = /^\s*FISIP\s+Lengkap\s*\(\s*Tina\s*\)\s*$/i;
+
 export async function parseExcelFile(file: File): Promise<{ sheets: SheetPreview[] }> {
   const buf = await file.arrayBuffer();
   const wb = XLSX.read(buf, { type: "array" });
+  const namaCocok = wb.SheetNames.filter((n) => NAMA_SHEET_TINA.test(n));
+  if (namaCocok.length === 0) {
+    throw new Error(
+      'File tidak memiliki sheet bernama "FISIP Lengkap (Tina)". Impor hanya menerima sheet tersebut.',
+    );
+  }
   const sheets: SheetPreview[] = [];
-  for (const name of wb.SheetNames) {
+  for (const name of namaCocok) {
     const ws = wb.Sheets[name];
     const rows: unknown[][] = XLSX.utils.sheet_to_json(ws, {
       header: 1,
@@ -305,6 +315,7 @@ export function eksporBukuKeExcel(rows: unknown[], filename = "buku.xlsx") {
   }));
   const ws = XLSX.utils.json_to_sheet(data);
   const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, "Buku");
+  // Nama sheet Excel dibatasi 31 karakter oleh spesifikasi; nama ini 20 char.
+  XLSX.utils.book_append_sheet(wb, ws, "FISIP Lengkap (Tina)");
   XLSX.writeFile(wb, filename);
 }

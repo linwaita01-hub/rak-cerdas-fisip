@@ -34,7 +34,6 @@ import {
   Trash2,
   Search,
   RefreshCw,
-  Table2,
   Clock,
   BookOpen,
   ScanLine,
@@ -48,7 +47,6 @@ import {
   ExportBukuButton,
   ImportBukuButton,
   HistoryButton,
-  TabSampah,
 } from "@/components/dashboard/InventoryTools";
 import { toast } from "sonner";
 import { Barcode } from "@/components/Barcode";
@@ -75,11 +73,10 @@ export function StaffDashboard() {
   const isSuperAdmin = role === "super_admin";
   return (
     <Tabs defaultValue="transaksi" className="w-full">
-      <TabsList className={`grid w-full ${isSuperAdmin ? "grid-cols-6" : "grid-cols-5"} sm:w-auto`}>
+      <TabsList className={`grid w-full ${isSuperAdmin ? "grid-cols-5" : "grid-cols-4"} sm:w-auto`}>
         <TabsTrigger value="transaksi">Transaksi</TabsTrigger>
         <TabsTrigger value="inventaris">Inventaris</TabsTrigger>
         <TabsTrigger value="mahasiswa">Mahasiswa</TabsTrigger>
-        <TabsTrigger value="sampah">Sampah</TabsTrigger>
         <TabsTrigger value="pengaturan">Pengaturan</TabsTrigger>
         {isSuperAdmin && <TabsTrigger value="super">Super Admin</TabsTrigger>}
       </TabsList>
@@ -91,9 +88,6 @@ export function StaffDashboard() {
       </TabsContent>
       <TabsContent value="mahasiswa" className="mt-4">
         <TabMahasiswa />
-      </TabsContent>
-      <TabsContent value="sampah" className="mt-4">
-        <TabSampah />
       </TabsContent>
       <TabsContent value="pengaturan" className="mt-4">
         <TabPengaturan />
@@ -686,12 +680,6 @@ function TabInventaris() {
         </div>
         <ExportBukuButton selected={selectedRows} allRows={allRows} />
         <ImportBukuButton />
-        <Button asChild variant="outline">
-          <Link to="/editor-buku">
-            <Table2 className="mr-2 h-4 w-4" />
-            Editor mirip Excel
-          </Link>
-        </Button>
         <Button onClick={() => setEditBuku({})}>
           <Plus className="mr-2 h-4 w-4" />
           Buku baru

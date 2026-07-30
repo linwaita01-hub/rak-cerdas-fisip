@@ -16,7 +16,6 @@ import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as BlogManfaatSistemPerpustakaanDigitalRouteImport } from './routes/blog.manfaat-sistem-perpustakaan-digital'
 import { Route as AuthenticatedLengkapiProfilRouteImport } from './routes/_authenticated/lengkapi-profil'
-import { Route as AuthenticatedEditorBukuRouteImport } from './routes/_authenticated/editor-buku'
 import { Route as AuthenticatedAppRouteImport } from './routes/_authenticated/app'
 
 const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
@@ -55,11 +54,6 @@ const AuthenticatedLengkapiProfilRoute =
     path: '/lengkapi-profil',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
-const AuthenticatedEditorBukuRoute = AuthenticatedEditorBukuRouteImport.update({
-  id: '/editor-buku',
-  path: '/editor-buku',
-  getParentRoute: () => AuthenticatedRouteRoute,
-} as any)
 const AuthenticatedAppRoute = AuthenticatedAppRouteImport.update({
   id: '/app',
   path: '/app',
@@ -72,7 +66,6 @@ export interface FileRoutesByFullPath {
   '/katalog': typeof KatalogRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/app': typeof AuthenticatedAppRoute
-  '/editor-buku': typeof AuthenticatedEditorBukuRoute
   '/lengkapi-profil': typeof AuthenticatedLengkapiProfilRoute
   '/blog/manfaat-sistem-perpustakaan-digital': typeof BlogManfaatSistemPerpustakaanDigitalRoute
 }
@@ -82,7 +75,6 @@ export interface FileRoutesByTo {
   '/katalog': typeof KatalogRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/app': typeof AuthenticatedAppRoute
-  '/editor-buku': typeof AuthenticatedEditorBukuRoute
   '/lengkapi-profil': typeof AuthenticatedLengkapiProfilRoute
   '/blog/manfaat-sistem-perpustakaan-digital': typeof BlogManfaatSistemPerpustakaanDigitalRoute
 }
@@ -94,7 +86,6 @@ export interface FileRoutesById {
   '/katalog': typeof KatalogRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/_authenticated/app': typeof AuthenticatedAppRoute
-  '/_authenticated/editor-buku': typeof AuthenticatedEditorBukuRoute
   '/_authenticated/lengkapi-profil': typeof AuthenticatedLengkapiProfilRoute
   '/blog/manfaat-sistem-perpustakaan-digital': typeof BlogManfaatSistemPerpustakaanDigitalRoute
 }
@@ -106,7 +97,6 @@ export interface FileRouteTypes {
     | '/katalog'
     | '/sitemap.xml'
     | '/app'
-    | '/editor-buku'
     | '/lengkapi-profil'
     | '/blog/manfaat-sistem-perpustakaan-digital'
   fileRoutesByTo: FileRoutesByTo
@@ -116,7 +106,6 @@ export interface FileRouteTypes {
     | '/katalog'
     | '/sitemap.xml'
     | '/app'
-    | '/editor-buku'
     | '/lengkapi-profil'
     | '/blog/manfaat-sistem-perpustakaan-digital'
   id:
@@ -127,7 +116,6 @@ export interface FileRouteTypes {
     | '/katalog'
     | '/sitemap.xml'
     | '/_authenticated/app'
-    | '/_authenticated/editor-buku'
     | '/_authenticated/lengkapi-profil'
     | '/blog/manfaat-sistem-perpustakaan-digital'
   fileRoutesById: FileRoutesById
@@ -192,13 +180,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedLengkapiProfilRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
-    '/_authenticated/editor-buku': {
-      id: '/_authenticated/editor-buku'
-      path: '/editor-buku'
-      fullPath: '/editor-buku'
-      preLoaderRoute: typeof AuthenticatedEditorBukuRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
     '/_authenticated/app': {
       id: '/_authenticated/app'
       path: '/app'
@@ -211,13 +192,11 @@ declare module '@tanstack/react-router' {
 
 interface AuthenticatedRouteRouteChildren {
   AuthenticatedAppRoute: typeof AuthenticatedAppRoute
-  AuthenticatedEditorBukuRoute: typeof AuthenticatedEditorBukuRoute
   AuthenticatedLengkapiProfilRoute: typeof AuthenticatedLengkapiProfilRoute
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedAppRoute: AuthenticatedAppRoute,
-  AuthenticatedEditorBukuRoute: AuthenticatedEditorBukuRoute,
   AuthenticatedLengkapiProfilRoute: AuthenticatedLengkapiProfilRoute,
 }
 
@@ -236,3 +215,13 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
