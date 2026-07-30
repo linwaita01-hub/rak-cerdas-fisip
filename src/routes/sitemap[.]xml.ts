@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import type {} from "@tanstack/react-start";
+import type {} from "@tanstack/start-client-core";
 
 const BASE_URL = "https://rak-cerdas-fisip.lovable.app";
 
@@ -51,4 +51,4 @@ export const Route = createFileRoute("/sitemap.xml")({
       },
     },
   },
-});
+} as never);
