@@ -39,6 +39,7 @@ import {
   BookOpen,
   ScanLine,
   Send,
+  X,
 } from "lucide-react";
 import { KONFIRMASI_DETIK } from "@/lib/pinjam";
 import { useGlobalScan } from "@/hooks/useGlobalScan";
@@ -177,24 +178,14 @@ function TabTransaksi() {
       <PinjamMejaCard />
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle className="text-base">Pengembalian (scan barcode)</CardTitle>
+          <CardTitle className="text-base">Pemeliharaan</CardTitle>
         </CardHeader>
         <CardContent>
-          <BarcodeScannerInput
-            placeholder="Scan barcode eksemplar untuk pengembalian…"
-            onScan={async (code) => {
-              try {
-                const res = await kembalikan({ data: { barcode: code } });
-                toast.success(
-                  res.denda
-                    ? `Kembali. Denda: ${fmtIDR(Number(res.denda.jumlah))}`
-                    : "Buku dikembalikan.",
-                );
-              } catch (e) {
-                toast.error(e instanceof Error ? e.message : "Gagal.");
-              }
-            }}
-          />
+          <p className="text-sm text-muted-foreground">
+            Untuk mengakhiri peminjaman, tekan tombol{" "}
+            <span className="font-medium text-foreground">×</span> di baris peminjaman aktif pada
+            tabel di bawah.
+          </p>
           <div className="mt-4 flex justify-end">
             <Button
               variant="outline"
@@ -234,6 +225,7 @@ function TabTransaksi() {
                 <TableHead>Eksemplar</TableHead>
                 <TableHead>Jatuh tempo</TableHead>
                 <TableHead>Status</TableHead>
+                <TableHead className="text-right">Aksi</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -251,11 +243,44 @@ function TabTransaksi() {
                       {p.status}
                     </Badge>
                   </TableCell>
+                  <TableCell className="text-right">
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="h-8 w-8 text-destructive"
+                      title="Akhiri peminjaman (kembalikan buku)"
+                      onClick={async () => {
+                        const bc = p.eksemplar?.barcode_value;
+                        if (!bc) {
+                          toast.error("Barcode eksemplar tidak diketahui.");
+                          return;
+                        }
+                        if (
+                          !confirm(
+                            `Akhiri peminjaman "${p.buku?.judul ?? "buku ini"}" oleh ${p.profil?.nama ?? "mahasiswa"}?`,
+                          )
+                        )
+                          return;
+                        try {
+                          const res = await kembalikan({ data: { barcode: bc } });
+                          toast.success(
+                            res.denda
+                              ? `Selesai. Denda: ${fmtIDR(Number(res.denda.jumlah))}`
+                              : "Peminjaman diakhiri.",
+                          );
+                        } catch (e) {
+                          toast.error(e instanceof Error ? e.message : "Gagal.");
+                        }
+                      }}
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </TableCell>
                 </TableRow>
               ))}
               {!aktif.data?.length && (
                 <TableRow>
-                  <TableCell colSpan={5} className="text-center text-sm text-muted-foreground">
+                  <TableCell colSpan={6} className="text-center text-sm text-muted-foreground">
                     Tidak ada peminjaman aktif.
                   </TableCell>
                 </TableRow>
