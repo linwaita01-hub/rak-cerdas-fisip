@@ -3,8 +3,7 @@ import { type Page, expect } from "@playwright/test";
 export const SUPABASE_URL = "https://ehftibpdwpeszobzagua.supabase.co";
 export const PUBLISHABLE = "sb_publishable_8O8i-B-0cBOtzGUM1PXhUg_nzp4pjFc";
 
-export const ADMIN = { email: "admin.demo@fisip.ulm.ac.id", password: "AdminDemo#2026" };
-export const MAHASISWA = { email: "mahasiswa.demo@fisip.ulm.ac.id", password: "MhsDemo#2026" };
+export const ADMIN = { email: "adminfisif@fisip.ulm.ac.id", password: "fisif123" };
 
 // Menunggu React selesai hidrasi (agar handler onSubmit dsb. sudah terpasang
 // dan form tidak ter-submit natif). __perpusReady diset di RootComponent.

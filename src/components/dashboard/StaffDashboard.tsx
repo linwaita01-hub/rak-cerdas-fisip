@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { Link } from "@tanstack/react-router";
@@ -34,13 +34,11 @@ import {
   Trash2,
   Search,
   RefreshCw,
-  Clock,
   BookOpen,
   ScanLine,
   Send,
   X,
 } from "lucide-react";
-import { KONFIRMASI_DETIK } from "@/lib/pinjam";
 import { useGlobalScan } from "@/hooks/useGlobalScan";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -114,8 +112,10 @@ function TabTransaksi() {
     const ch = supabase
       .channel("staff-transaksi")
       .on("postgres_changes", { event: "*", schema: "public", table: "peminjaman" }, () => {
-        qc.invalidateQueries({ queryKey: ["menunggu-konfirmasi"] });
         qc.invalidateQueries({ queryKey: ["pinjaman-aktif"] });
+      })
+      .on("postgres_changes", { event: "*", schema: "public", table: "eksemplar" }, () => {
+        qc.invalidateQueries({ queryKey: ["buku-list"] });
       })
       .on("postgres_changes", { event: "*", schema: "public", table: "denda" }, () => {
         qc.invalidateQueries({ queryKey: ["denda-list"] });
@@ -125,19 +125,6 @@ function TabTransaksi() {
       supabase.removeChannel(ch);
     };
   }, [qc]);
-
-  const menunggu = useQuery({
-    queryKey: ["menunggu-konfirmasi"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("peminjaman")
-        .select("*, buku:buku_id(id,judul,kode_buku), profil:user_id(id,nama,nim,prodi)")
-        .eq("status", "menunggu")
-        .order("tanggal_pengajuan", { ascending: false });
-      if (error) throw error;
-      return data ?? [];
-    },
-  });
 
   const aktif = useQuery({
     queryKey: ["pinjaman-aktif"],
@@ -198,11 +185,6 @@ function TabTransaksi() {
           </div>
         </CardContent>
       </Card>
-
-      <MenungguKonfirmasiCard
-        rows={(menunggu.data ?? []) as unknown as MenungguRow[]}
-        loading={menunggu.isLoading}
-      />
 
       <Card className="lg:col-span-2">
         <CardHeader>
@@ -426,12 +408,12 @@ function PinjamMejaCard() {
     setBusy(true);
     try {
       const r = await mulai({ data: { barcode, user_id: terpilih.id, durasi_hari: durasi } });
-      toast.success(`Permintaan dikirim ke ${r.nama ?? "mahasiswa"} untuk dikonfirmasi.`);
+      toast.success(`Peminjaman dicatat untuk ${r.nama ?? "mahasiswa"}.`);
       setBarcode("");
       setBuku(null);
       setCari("");
       setTerpilih(null);
-      qc.invalidateQueries({ queryKey: ["menunggu-konfirmasi"] });
+      qc.invalidateQueries({ queryKey: ["pinjaman-aktif"] });
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Gagal.");
     } finally {
@@ -540,96 +522,15 @@ function PinjamMejaCard() {
             ) : (
               <Send className="mr-2 h-4 w-4" />
             )}
-            Kirim permintaan konfirmasi
+            Catat peminjaman
           </Button>
         </div>
         <p className="text-xs text-muted-foreground">
-          Mahasiswa terpilih akan diminta mengonfirmasi di perangkatnya (batal otomatis dalam{" "}
-          {KONFIRMASI_DETIK} detik).
+          Peminjaman langsung tercatat aktif. Pastikan identitas mahasiswa benar sebelum menekan
+          tombol.
         </p>
       </CardContent>
     </Card>
-  );
-}
-
-// ---- Kartu: Menunggu konfirmasi mahasiswa (dengan hitung mundur) ----
-type MenungguRow = {
-  id: string;
-  tanggal_pengajuan: string;
-  buku: { judul: string | null } | null;
-  profil: { nama: string | null; nim: string | null } | null;
-};
-
-function MenungguKonfirmasiCard({ rows, loading }: { rows: MenungguRow[]; loading: boolean }) {
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-base">Menunggu konfirmasi ({rows.length})</CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-2">
-        {loading && <Loader2 className="h-4 w-4 animate-spin" />}
-        {!loading && rows.length === 0 && (
-          <p className="text-sm text-muted-foreground">Tidak ada permintaan menunggu.</p>
-        )}
-        {rows.map((p) => (
-          <KonfirmasiRow key={p.id} p={p} />
-        ))}
-      </CardContent>
-    </Card>
-  );
-}
-
-function KonfirmasiRow({ p }: { p: MenungguRow }) {
-  const [sisa, setSisa] = useState(KONFIRMASI_DETIK);
-  const dibatalkan = useRef(false);
-
-  useEffect(() => {
-    const hitung = () => {
-      const lewat = (Date.now() - new Date(p.tanggal_pengajuan).getTime()) / 1000;
-      return Math.max(0, Math.ceil(KONFIRMASI_DETIK - lewat));
-    };
-    setSisa(hitung());
-    const t = setInterval(() => {
-      const s = hitung();
-      setSisa(s);
-      if (s <= 0 && !dibatalkan.current) {
-        dibatalkan.current = true;
-        (supabase.rpc as any)("batalkan_peminjaman_meja", {
-          _id: p.id,
-          _alasan: "Kedaluwarsa: tidak dikonfirmasi",
-        }).then(() => undefined);
-      }
-    }, 500);
-    return () => clearInterval(t);
-  }, [p.id, p.tanggal_pengajuan]);
-
-  async function batalManual() {
-    dibatalkan.current = true;
-    await (supabase.rpc as any)("batalkan_peminjaman_meja", {
-      _id: p.id,
-      _alasan: "Dibatalkan petugas",
-    });
-    toast.message("Permintaan dibatalkan.");
-  }
-
-  return (
-    <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border p-3">
-      <div className="text-sm">
-        <p className="font-medium">{p.buku?.judul}</p>
-        <p className="text-xs text-muted-foreground">
-          {p.profil?.nama} · {p.profil?.nim}
-        </p>
-      </div>
-      <div className="flex items-center gap-2">
-        <Badge variant={sisa > 0 ? "secondary" : "destructive"}>
-          <Clock className="mr-1 h-3 w-3" />
-          {sisa > 0 ? `${sisa}s` : "habis"}
-        </Badge>
-        <Button size="sm" variant="ghost" onClick={batalManual}>
-          Batalkan
-        </Button>
-      </div>
-    </div>
   );
 }
 

@@ -74,6 +74,22 @@ function Katalog({ dapatPinjam }: { dapatPinjam: boolean }) {
   const [kategori, setKategori] = useState("");
   const [detail, setDetail] = useState<BukuKatalog | null>(null);
 
+  // Realtime: perubahan katalog (buku/eksemplar) langsung memicu refetch.
+  useEffect(() => {
+    const ch = supabase
+      .channel("mhs-katalog")
+      .on("postgres_changes", { event: "*", schema: "public", table: "buku" }, () =>
+        qc.invalidateQueries({ queryKey: ["katalog"] }),
+      )
+      .on("postgres_changes", { event: "*", schema: "public", table: "eksemplar" }, () =>
+        qc.invalidateQueries({ queryKey: ["katalog"] }),
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(ch);
+    };
+  }, [qc]);
+
   const q = useQuery({
     queryKey: ["katalog", search, kategori],
     queryFn: async () => {

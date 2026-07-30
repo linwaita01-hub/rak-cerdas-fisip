@@ -2,23 +2,15 @@ import { test } from "@playwright/test";
 import {
   login,
   ADMIN,
-  MAHASISWA,
   getToken,
   seedBook,
   cleanupE2E,
   eksemplarStatus,
   peminjamanStatus,
-  eksemplarIdByBarcode,
-  profilIdByEmail,
-  buatMenunggu,
-  callRpc,
-  rpcAda,
   expect,
 } from "./helpers";
 
-const DUMMY_ID = "00000000-0000-0000-0000-000000000000";
-
-test.describe("Alur pinjam di meja (model baru)", () => {
+test.describe("Alur pinjam di meja (model langsung aktif)", () => {
   let token: string;
   test.beforeAll(async () => {
     token = await getToken(ADMIN.email, ADMIN.password);
@@ -28,64 +20,28 @@ test.describe("Alur pinjam di meja (model baru)", () => {
     await cleanupE2E(token);
   });
 
-  test("admin scan + pilih mahasiswa → menunggu konfirmasi + eksemplar dipesan", async ({
-    page,
-  }) => {
+  test("admin scan + pilih mahasiswa → dipinjam + eksemplar dipinjam", async ({ page }) => {
     const { bukuId, barcode, judul } = await seedBook(token);
 
     await login(page, ADMIN.email, ADMIN.password);
-    // Tab Transaksi default; kartu "Pinjam di meja" muncul pertama.
+    // Kartu "Pinjam di meja" muncul pertama di tab Transaksi (default).
     const scan = page.getByPlaceholder(/Scan \/ ketik barcode buku/);
     await scan.fill(barcode);
     await scan.press("Enter");
     await expect(page.getByText(judul).first()).toBeVisible();
 
-    // Cari & pilih mahasiswa demo.
-    await page.getByPlaceholder(/Cari nama \/ NIM \/ email/).fill("Mahasiswa Demo");
-    await page
-      .getByRole("button", { name: /Mahasiswa Demo/ })
-      .first()
-      .click();
+    // Cari & pilih mahasiswa terdaftar apa saja (nama tidak dispesifikasi
+    // — biarkan admin memilih baris pertama hasil pencarian).
+    await page.getByPlaceholder(/Cari nama \/ NIM \/ email/).fill("a");
+    const kandidat = page.getByRole("button").filter({ hasText: /·/ }).first();
+    await expect(kandidat).toBeVisible();
+    await kandidat.click();
 
-    await page.getByRole("button", { name: /Kirim permintaan konfirmasi/ }).click();
-    await expect(page.getByText(/Permintaan dikirim/i)).toBeVisible();
+    await page.getByRole("button", { name: /Catat peminjaman/ }).click();
+    await expect(page.getByText(/Peminjaman dicatat/i)).toBeVisible();
 
-    await expect.poll(async () => peminjamanStatus(token, bukuId)).toBe("menunggu");
-    expect(await eksemplarStatus(token, barcode)).toBe("dipesan");
-  });
-
-  test("mahasiswa konfirmasi (RPC) → dipinjam → kembalikan → tersedia", async ({ page }) => {
-    const mhsToken = await getToken(MAHASISWA.email, MAHASISWA.password);
-    const ada = await rpcAda(mhsToken, "konfirmasi_peminjaman", { _id: DUMMY_ID });
-    test.skip(
-      !ada,
-      "RPC konfirmasi_peminjaman belum ada di DB — terapkan migrasi 20260721130000 via Lovable, lalu jalankan lagi.",
-    );
-
-    const { bukuId, barcode } = await seedBook(token);
-    const eksemplarId = await eksemplarIdByBarcode(token, barcode);
-    const userId = await profilIdByEmail(token, MAHASISWA.email);
-    expect(eksemplarId && userId).toBeTruthy();
-    const pinjamId = await buatMenunggu(token, {
-      bukuId,
-      eksemplarId: eksemplarId!,
-      userId: userId!,
-    });
-
-    // Mahasiswa mengonfirmasi lewat RPC (yang dipakai dialog konfirmasi).
-    const r = await callRpc(mhsToken, "konfirmasi_peminjaman", { _id: pinjamId });
-    expect(r.status).toBeLessThan(300);
+    // Langsung aktif — tanpa fase menunggu.
     await expect.poll(async () => peminjamanStatus(token, bukuId)).toBe("dipinjam");
     expect(await eksemplarStatus(token, barcode)).toBe("dipinjam");
-
-    // Admin mengembalikan via scan.
-    await login(page, ADMIN.email, ADMIN.password);
-    const kembali = page.getByPlaceholder(/Scan barcode eksemplar untuk pengembalian/);
-    await kembali.fill(barcode);
-    await kembali.press("Enter");
-    await expect(page.getByText(/dikembalikan/i)).toBeVisible();
-
-    await expect.poll(async () => eksemplarStatus(token, barcode)).toBe("tersedia");
-    expect(await peminjamanStatus(token, bukuId)).toBe("dikembalikan");
   });
 });

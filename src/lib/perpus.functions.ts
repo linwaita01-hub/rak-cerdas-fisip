@@ -50,9 +50,10 @@ export const batalkanReservasi = createServerFn({ method: "POST" })
   });
 
 // ============= STAFF: PINJAM DI MEJA (scan) & PENGEMBALIAN =============
-// Admin memindai eksemplar & memilih mahasiswa → buat permintaan berstatus
-// 'menunggu' (eksemplar ditahan → 'dipesan'). Mahasiswa mengonfirmasi lewat
-// RPC konfirmasi_peminjaman (migrasi 20260721130000_pinjam_meja_konfirmasi).
+// Admin memindai eksemplar & memilih mahasiswa → peminjaman LANGSUNG aktif
+// (status 'dipinjam', eksemplar 'dipinjam', jatuh tempo dihitung). Tidak ada
+// tahap konfirmasi mahasiswa: petugas yang bertanggung jawab menverifikasi
+// identitas di meja.
 export const mulaiPeminjamanMeja = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d) =>
@@ -89,10 +90,10 @@ export const mulaiPeminjamanMeja = createServerFn({ method: "POST" })
     if (e1) throw new Error(e1.message);
     if (!eks) throw new Error("Barcode eksemplar tidak dikenali.");
 
-    // Tahan eksemplar secara atomik: tersedia → dipesan.
+    // Kunci eksemplar secara atomik: tersedia → dipinjam.
     const { data: held, error: eHold } = await context.supabase
       .from("eksemplar")
-      .update({ status: "dipesan" })
+      .update({ status: "dipinjam" })
       .eq("id", eks.id)
       .eq("status", "tersedia")
       .select("id");
@@ -100,21 +101,25 @@ export const mulaiPeminjamanMeja = createServerFn({ method: "POST" })
     if (!held || held.length === 0)
       throw new Error(`Eksemplar sedang berstatus "${eks.status}", tidak bisa dipinjam.`);
 
-    // Buat permintaan menunggu konfirmasi mahasiswa.
+    // Buat baris peminjaman aktif dengan jatuh tempo.
+    const now = new Date();
+    const jatuhTempo = new Date(now.getTime() + data.durasi_hari * 86400000);
     const { data: row, error: e2 } = await context.supabase
       .from("peminjaman")
       .insert({
         user_id: data.user_id,
         buku_id: eks.buku_id,
         eksemplar_id: eks.id,
-        status: "menunggu",
+        status: "dipinjam",
         durasi_hari: data.durasi_hari,
         disetujui_oleh: context.userId,
+        tanggal_pinjam: now.toISOString(),
+        tanggal_jatuh_tempo: jatuhTempo.toISOString(),
       })
       .select("id")
       .single();
     if (e2) {
-      // Lepas tahanan bila gagal membuat baris.
+      // Kembalikan status eksemplar bila gagal membuat baris.
       await context.supabase.from("eksemplar").update({ status: "tersedia" }).eq("id", eks.id);
       throw new Error(e2.message);
     }
@@ -545,7 +550,10 @@ export const tambahMahasiswa = createServerFn({ method: "POST" })
     z
       .object({
         nama: z.string().trim().min(3),
-        nim: z.string().trim().regex(/^\d{6,15}$/),
+        nim: z
+          .string()
+          .trim()
+          .regex(/^\d{6,15}$/),
         prodi: z.string().trim().min(2),
         email: z.string().trim().email().optional().or(z.literal("")),
       })

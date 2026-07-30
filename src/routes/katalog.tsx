@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useEffect, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { BrandHeader } from "@/components/BrandHeader";
 import { BukuDetail } from "@/components/katalog/BukuDetail";
@@ -20,8 +20,25 @@ export const Route = createFileRoute("/katalog")({
 });
 
 function KatalogPage() {
+  const qc = useQueryClient();
   const [search, setSearch] = useState("");
   const [detail, setDetail] = useState<BukuKatalog | null>(null);
+
+  // Realtime: buku baru / perubahan ketersediaan langsung tampil tanpa refresh.
+  useEffect(() => {
+    const ch = supabase
+      .channel("katalog-publik")
+      .on("postgres_changes", { event: "*", schema: "public", table: "buku" }, () =>
+        qc.invalidateQueries({ queryKey: ["katalog-publik"] }),
+      )
+      .on("postgres_changes", { event: "*", schema: "public", table: "eksemplar" }, () =>
+        qc.invalidateQueries({ queryKey: ["katalog-publik"] }),
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(ch);
+    };
+  }, [qc]);
 
   const q = useQuery({
     queryKey: ["katalog-publik", search],
