@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { Link } from "@tanstack/react-router";
+import { TambahMahasiswaDialog } from "@/components/dashboard/TambahMahasiswaDialog";
 import { supabase } from "@/integrations/supabase/client";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -460,15 +461,24 @@ function PinjamMejaCard() {
             </div>
           ) : (
             <>
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  value={cari}
-                  onChange={(e) => setCari(e.target.value)}
-                  placeholder="Cari nama / NIM / email…"
-                  className="pl-9"
+              <div className="flex items-center gap-2">
+                <div className="relative flex-1">
+                  <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    value={cari}
+                    onChange={(e) => setCari(e.target.value)}
+                    placeholder="Cari nama / NIM / email…"
+                    className="pl-9"
+                  />
+                </div>
+                <TambahMahasiswaDialog
+                  onCreated={(m) => {
+                    setTerpilih({ id: m.id, nama: m.nama, nim: m.nim });
+                    setCari("");
+                  }}
                 />
               </div>
+
               {cari.trim().length >= 2 && (
                 <div className="mt-1 max-h-40 space-y-1 overflow-auto">
                   {hasil.isFetching && <Loader2 className="h-4 w-4 animate-spin" />}

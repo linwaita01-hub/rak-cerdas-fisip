@@ -82,13 +82,11 @@ export const KOLOM_KATALOG: { label: string; get: (b: BukuKatalog) => string | n
   { label: "Deskripsi", get: (b) => b.deskripsi },
 ];
 
-// URL foto sampul: dukung URL penuh (http) maupun path di bucket Storage 'sampul'.
-export function fotoUrl(b: BukuKatalog): string | null {
+// Nilai mentah sampul (URL penuh atau path Storage 'sampul'). Konsumen
+// menggunakan komponen <SampulImg /> atau hook useSampul untuk merender.
+export function fotoRaw(b: BukuKatalog): string | null {
   const raw = b.sampul_path || m(b, "foto");
-  if (!raw) return null;
-  if (/^https?:\/\//i.test(raw)) return raw;
-  const { data } = supabase.storage.from("sampul").getPublicUrl(raw);
-  return data.publicUrl;
+  return raw || null;
 }
 
 // Sisa kolom di `meta` yang belum ditampilkan lewat KOLOM_KATALOG.

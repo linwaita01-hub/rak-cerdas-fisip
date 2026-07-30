@@ -4,13 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Upload, Clipboard, X, Image as ImageIcon, Loader2 } from "lucide-react";
 import { toast } from "sonner";
-
-// Menyelesaikan nilai sampul menjadi URL yang bisa dirender.
-function resolveSrc(raw: string): string | null {
-  if (!raw) return null;
-  if (/^(https?:|data:|blob:)/i.test(raw)) return raw;
-  return supabase.storage.from("sampul").getPublicUrl(raw).data.publicUrl;
-}
+import { useSampul } from "@/lib/sampul";
 
 /**
  * Input foto sampul buku: unggah file, tempel gambar dari clipboard (Ctrl+V
@@ -28,7 +22,7 @@ export function FotoField({
 }) {
   const fileRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
-  const src = resolveSrc(value);
+  const src = useSampul(value);
 
   async function unggah(file: File) {
     if (!file.type.startsWith("image/")) {

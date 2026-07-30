@@ -1,10 +1,10 @@
 import { Badge } from "@/components/ui/badge";
-import { BookOpen } from "lucide-react";
-import { KOLOM_KATALOG, metaSisa, fotoUrl, ketersediaan, type BukuKatalog } from "@/lib/katalog";
+import { KOLOM_KATALOG, metaSisa, fotoRaw, ketersediaan, type BukuKatalog } from "@/lib/katalog";
+import { SampulImg } from "@/components/katalog/SampulImg";
 
 /** Menampilkan SELURUH informasi buku (kolom sheet-7-tina) + pratinjau foto. */
 export function BukuDetail({ buku }: { buku: BukuKatalog }) {
-  const foto = fotoUrl(buku);
+  const foto = fotoRaw(buku);
   const { tersedia, total } = ketersediaan(buku);
   const baris = KOLOM_KATALOG.map((k) => ({ label: k.label, value: k.get(buku) })).filter(
     (r) => r.value != null && r.value !== "",
@@ -15,15 +15,11 @@ export function BukuDetail({ buku }: { buku: BukuKatalog }) {
     <div className="grid gap-4 sm:grid-cols-[140px_1fr]">
       <div>
         <div className="flex aspect-[3/4] w-full items-center justify-center overflow-hidden rounded-md border bg-muted">
-          {foto ? (
-            <img
-              src={foto}
-              alt={buku.judul ?? "Sampul buku"}
-              className="h-full w-full object-cover"
-            />
-          ) : (
-            <BookOpen className="h-10 w-10 text-muted-foreground" />
-          )}
+          <SampulImg
+            raw={foto}
+            alt={buku.judul ?? "Sampul buku"}
+            className="h-full w-full object-cover"
+          />
         </div>
         <div className="mt-2">
           <Badge variant={tersedia > 0 ? "default" : "destructive"}>

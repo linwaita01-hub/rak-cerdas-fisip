@@ -51,7 +51,7 @@ function Landing() {
           </p>
           <div className="mt-6 flex flex-wrap justify-center gap-3">
             <Button asChild size="lg">
-              <Link to="/auth">Masuk / Daftar</Link>
+              <Link to="/auth">Masuk</Link>
             </Button>
             <Button asChild size="lg" variant="outline">
               <Link to="/katalog">Lihat Katalog</Link>
