@@ -49,6 +49,8 @@ import {
 import { toast } from "sonner";
 import { Barcode } from "@/components/Barcode";
 import { BarcodeScannerInput } from "@/components/BarcodeScannerInput";
+import { cariEksemplarDariScan, normalisasiBarcode } from "@/lib/barcode-lookup";
+
 import { fmtIDR, fmtWITA, useMe } from "@/hooks/useMe";
 import { AdminSementaraPanel } from "@/components/dashboard/AdminSementaraPanel";
 import { FotoField } from "@/components/katalog/FotoField";
