@@ -128,13 +128,9 @@ export const kembalikanBarcode = createServerFn({ method: "POST" })
   .inputValidator((d) => z.object({ barcode: z.string().min(1) }).parse(d))
   .handler(async ({ data, context }) => {
     await ensureStaff(context);
-    const { data: eks, error: e1 } = await context.supabase
-      .from("eksemplar")
-      .select("*")
-      .eq("barcode_value", data.barcode)
-      .maybeSingle();
-    if (e1) throw new Error(e1.message);
+    const eks = await cariEksemplarDariScan(context.supabase, data.barcode);
     if (!eks) throw new Error("Barcode tidak dikenali.");
+
 
     const { data: p, error: e2 } = await context.supabase
       .from("peminjaman")
