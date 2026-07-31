@@ -3,6 +3,8 @@ import { z } from "zod";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import type { Database } from "@/integrations/supabase/types";
+import { cariEksemplarDariScan } from "@/lib/barcode-lookup";
+
 
 // ============= Helper =============
 async function ensureStaff(context: { supabase: SupabaseClient<Database>; userId: string }) {
