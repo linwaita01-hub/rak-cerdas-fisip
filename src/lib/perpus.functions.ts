@@ -225,14 +225,35 @@ const bukuSchema = z.object({
   meta: z.record(z.string(), z.string()).optional().nullable(),
   // Untuk buku baru: langsung buat sejumlah eksemplar.
   jumlah_eksemplar: z.number().int().min(0).max(500).optional().nullable(),
+  // Kode eksemplar/barcode awal yang diketik petugas (mis. "240010001").
+  // Eksemplar dibuat mengikuti nilai ini, bukan kode buku otomatis.
+  kode_eksemplar_awal: z.string().trim().min(1).max(64).optional().nullable(),
 });
+
+/**
+ * Buat deretan kode eksemplar mulai dari kode yang diinput petugas.
+ * "240010001" -> 240010001, 240010002, ...  ("A/12" -> "A/12", "A/13").
+ * Bila tidak ada angka di akhir, tambahkan sufiks -0002 dst.
+ */
+function deretKodeEksemplar(awal: string, jumlah: number): string[] {
+  const base = awal.trim();
+  const m = base.match(/^(.*?)(\d+)$/);
+  if (!m) return Array.from({ length: jumlah }, (_, i) => (i === 0 ? base : `${base}-${String(i + 1).padStart(4, "0")}`));
+  const [, prefix, angka] = m;
+  const lebar = angka.length;
+  const mulai = Number(angka);
+  return Array.from(
+    { length: jumlah },
+    (_, i) => `${prefix}${String(mulai + i).padStart(lebar, "0")}`,
+  );
+}
 
 export const simpanBuku = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d) => bukuSchema.parse(d))
   .handler(async ({ data, context }) => {
     await ensureStaff(context);
-    const { id, jumlah_eksemplar, meta, kode_buku, ...sisa } = data;
+    const { id, jumlah_eksemplar, meta, kode_buku, kode_eksemplar_awal, ...sisa } = data;
     const rest = { ...sisa };
     // Hanya sertakan meta bila terisi (agar tetap jalan sebelum migrasi kolom meta).
     const dasar = meta && Object.keys(meta).length > 0 ? { ...rest, meta } : { ...rest };
@@ -267,16 +288,19 @@ export const simpanBuku = createServerFn({ method: "POST" })
     if (!row) throw new Error("Gagal membuat kode buku unik. Coba lagi.");
 
     // Buat eksemplar awal untuk buku baru.
-    if (jumlah_eksemplar && jumlah_eksemplar > 0) {
-      const eks = Array.from({ length: jumlah_eksemplar }, (_, i) => {
-        const kode = `${kodeFinal}-${String(i + 1).padStart(4, "0")}`;
-        return {
-          buku_id: row.id,
-          kode_eksemplar: kode,
-          barcode_value: kode,
-          status: "tersedia" as const,
-        };
-      });
+    // Kode mengikuti "Kode Barcot / Eksemplar" yang diinput petugas bila ada.
+    const awal = kode_eksemplar_awal?.trim();
+    const jml = jumlah_eksemplar && jumlah_eksemplar > 0 ? jumlah_eksemplar : awal ? 1 : 0;
+    if (jml > 0) {
+      const kodeList = awal
+        ? deretKodeEksemplar(awal, jml)
+        : Array.from({ length: jml }, (_, i) => `${kodeFinal}-${String(i + 1).padStart(4, "0")}`);
+      const eks = kodeList.map((kode) => ({
+        buku_id: row.id,
+        kode_eksemplar: kode,
+        barcode_value: kode,
+        status: "tersedia" as const,
+      }));
       const { error: eErr } = await context.supabase.from("eksemplar").insert(eks);
       if (eErr) throw new Error("Buku tersimpan, tapi gagal membuat eksemplar: " + eErr.message);
     }

@@ -838,6 +838,8 @@ function BukuForm({ initial, onSubmit }: { initial: any; onSubmit: (v: any) => P
         meta: Object.keys(meta).length ? meta : undefined,
         jumlah_eksemplar:
           !initial.id && v.jumlah_eksemplar ? Number(v.jumlah_eksemplar) : undefined,
+        // Eksemplar dibuat mengikuti kode barcot/eksemplar yang diinput.
+        kode_eksemplar_awal: !initial.id && v.kode_barcot?.trim() ? v.kode_barcot.trim() : undefined,
       });
     } finally {
       setSaving(false);
@@ -875,7 +877,7 @@ function BukuForm({ initial, onSubmit }: { initial: any; onSubmit: (v: any) => P
       ))}
       {!initial.id && (
         <div className="space-y-1">
-          <Label>Jumlah eksemplar (dibuat otomatis)</Label>
+          <Label>Jumlah eksemplar (kode mengikuti Kode Barcot)</Label>
           <Input
             type="number"
             min={0}
