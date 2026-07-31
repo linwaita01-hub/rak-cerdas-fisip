@@ -253,7 +253,7 @@ export const simpanBuku = createServerFn({ method: "POST" })
   .inputValidator((d) => bukuSchema.parse(d))
   .handler(async ({ data, context }) => {
     await ensureStaff(context);
-    const { id, jumlah_eksemplar, meta, kode_buku, ...sisa } = data;
+    const { id, jumlah_eksemplar, meta, kode_buku, kode_eksemplar_awal, ...sisa } = data;
     const rest = { ...sisa };
     // Hanya sertakan meta bila terisi (agar tetap jalan sebelum migrasi kolom meta).
     const dasar = meta && Object.keys(meta).length > 0 ? { ...rest, meta } : { ...rest };
