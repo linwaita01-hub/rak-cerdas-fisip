@@ -9,23 +9,22 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
-import { Route as KatalogRouteImport } from './routes/katalog'
-import { Route as AuthRouteImport } from './routes/auth'
-import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as IndexRouteImport } from './routes/index'
-import { Route as BlogManfaatSistemPerpustakaanDigitalRouteImport } from './routes/blog.manfaat-sistem-perpustakaan-digital'
-import { Route as AuthenticatedLengkapiProfilRouteImport } from './routes/_authenticated/lengkapi-profil'
+import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
+import { Route as AuthRouteImport } from './routes/auth'
+import { Route as KatalogRouteImport } from './routes/katalog'
+import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
 import { Route as AuthenticatedAppRouteImport } from './routes/_authenticated/app'
+import { Route as AuthenticatedLengkapiProfilRouteImport } from './routes/_authenticated/lengkapi-profil'
+import { Route as BlogManfaatSistemPerpustakaanDigitalRouteImport } from './routes/blog.manfaat-sistem-perpustakaan-digital'
 
-const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
-  id: '/sitemap.xml',
-  path: '/sitemap.xml',
+const IndexRoute = IndexRouteImport.update({
+  id: '/',
+  path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
-const KatalogRoute = KatalogRouteImport.update({
-  id: '/katalog',
-  path: '/katalog',
+const AuthenticatedRouteRoute = AuthenticatedRouteRouteImport.update({
+  id: '/_authenticated',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthRoute = AuthRouteImport.update({
@@ -33,32 +32,33 @@ const AuthRoute = AuthRouteImport.update({
   path: '/auth',
   getParentRoute: () => rootRouteImport,
 } as any)
-const AuthenticatedRouteRoute = AuthenticatedRouteRouteImport.update({
-  id: '/_authenticated',
+const KatalogRoute = KatalogRouteImport.update({
+  id: '/katalog',
+  path: '/katalog',
   getParentRoute: () => rootRouteImport,
 } as any)
-const IndexRoute = IndexRouteImport.update({
-  id: '/',
-  path: '/',
+const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
+  id: '/sitemap.xml',
+  path: '/sitemap.xml',
   getParentRoute: () => rootRouteImport,
 } as any)
-const BlogManfaatSistemPerpustakaanDigitalRoute =
-  BlogManfaatSistemPerpustakaanDigitalRouteImport.update({
-    id: '/blog/manfaat-sistem-perpustakaan-digital',
-    path: '/blog/manfaat-sistem-perpustakaan-digital',
-    getParentRoute: () => rootRouteImport,
-  } as any)
+const AuthenticatedAppRoute = AuthenticatedAppRouteImport.update({
+  id: '/app',
+  path: '/app',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedLengkapiProfilRoute =
   AuthenticatedLengkapiProfilRouteImport.update({
     id: '/lengkapi-profil',
     path: '/lengkapi-profil',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
-const AuthenticatedAppRoute = AuthenticatedAppRouteImport.update({
-  id: '/app',
-  path: '/app',
-  getParentRoute: () => AuthenticatedRouteRoute,
-} as any)
+const BlogManfaatSistemPerpustakaanDigitalRoute =
+  BlogManfaatSistemPerpustakaanDigitalRouteImport.update({
+    id: '/blog/manfaat-sistem-perpustakaan-digital',
+    path: '/blog/manfaat-sistem-perpustakaan-digital',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -131,25 +131,11 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/sitemap.xml': {
-      id: '/sitemap.xml'
-      path: '/sitemap.xml'
-      fullPath: '/sitemap.xml'
-      preLoaderRoute: typeof SitemapDotxmlRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/katalog': {
-      id: '/katalog'
-      path: '/katalog'
-      fullPath: '/katalog'
-      preLoaderRoute: typeof KatalogRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/auth': {
-      id: '/auth'
-      path: '/auth'
-      fullPath: '/auth'
-      preLoaderRoute: typeof AuthRouteImport
+    '/': {
+      id: '/'
+      path: '/'
+      fullPath: '/'
+      preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_authenticated': {
@@ -159,19 +145,33 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedRouteRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/': {
-      id: '/'
-      path: '/'
-      fullPath: '/'
-      preLoaderRoute: typeof IndexRouteImport
+    '/auth': {
+      id: '/auth'
+      path: '/auth'
+      fullPath: '/auth'
+      preLoaderRoute: typeof AuthRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/blog/manfaat-sistem-perpustakaan-digital': {
-      id: '/blog/manfaat-sistem-perpustakaan-digital'
-      path: '/blog/manfaat-sistem-perpustakaan-digital'
-      fullPath: '/blog/manfaat-sistem-perpustakaan-digital'
-      preLoaderRoute: typeof BlogManfaatSistemPerpustakaanDigitalRouteImport
+    '/katalog': {
+      id: '/katalog'
+      path: '/katalog'
+      fullPath: '/katalog'
+      preLoaderRoute: typeof KatalogRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/sitemap.xml': {
+      id: '/sitemap.xml'
+      path: '/sitemap.xml'
+      fullPath: '/sitemap.xml'
+      preLoaderRoute: typeof SitemapDotxmlRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_authenticated/app': {
+      id: '/_authenticated/app'
+      path: '/app'
+      fullPath: '/app'
+      preLoaderRoute: typeof AuthenticatedAppRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/lengkapi-profil': {
       id: '/_authenticated/lengkapi-profil'
@@ -180,12 +180,12 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedLengkapiProfilRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
-    '/_authenticated/app': {
-      id: '/_authenticated/app'
-      path: '/app'
-      fullPath: '/app'
-      preLoaderRoute: typeof AuthenticatedAppRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
+    '/blog/manfaat-sistem-perpustakaan-digital': {
+      id: '/blog/manfaat-sistem-perpustakaan-digital'
+      path: '/blog/manfaat-sistem-perpustakaan-digital'
+      fullPath: '/blog/manfaat-sistem-perpustakaan-digital'
+      preLoaderRoute: typeof BlogManfaatSistemPerpustakaanDigitalRouteImport
+      parentRoute: typeof rootRouteImport
     }
   }
 }
@@ -215,3 +215,13 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
