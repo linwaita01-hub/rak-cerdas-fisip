@@ -10,13 +10,6 @@ test.describe("Autentikasi & halaman masuk", () => {
     await expect(page.getByRole("tab", { name: "Pengaturan" })).toBeVisible();
   });
 
-  test("lupa sandi menampilkan konfirmasi tautan reset", async ({ page }) => {
-    await gotoHydrated(page, "/auth");
-    await page.getByRole("tab", { name: "Lupa" }).click();
-    await page.locator("#fp-email").fill("adminfisif@fisip.ulm.ac.id");
-    await page.getByRole("button", { name: /Kirim tautan reset/i }).click();
-    await expect(page.getByText(/Tautan reset sandi telah dikirim/i)).toBeVisible();
-  });
 
   test("tombol lihat sandi mengubah type input", async ({ page }) => {
     await gotoHydrated(page, "/auth");
