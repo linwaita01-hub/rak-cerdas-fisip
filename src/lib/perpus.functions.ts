@@ -80,15 +80,10 @@ export const mulaiPeminjamanMeja = createServerFn({ method: "POST" })
     });
     if (!layak) throw new Error("Mahasiswa memiliki denda belum lunas atau peminjaman terlambat.");
 
-    // Cari eksemplar dari barcode.
-    const { data: eks, error: e1 } = await context.supabase
-      .from("eksemplar")
-      .select("id, buku_id, status")
-      .eq("barcode_value", data.barcode)
-      .is("deleted_at", null)
-      .maybeSingle();
-    if (e1) throw new Error(e1.message);
+    // Cari eksemplar dari barcode (toleran spasi/kapital & kode buku).
+    const eks = await cariEksemplarDariScan(context.supabase, data.barcode);
     if (!eks) throw new Error("Barcode eksemplar tidak dikenali.");
+
 
     // Kunci eksemplar secara atomik: tersedia → dipinjam.
     const { data: held, error: eHold } = await context.supabase
