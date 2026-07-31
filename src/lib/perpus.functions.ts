@@ -225,7 +225,28 @@ const bukuSchema = z.object({
   meta: z.record(z.string(), z.string()).optional().nullable(),
   // Untuk buku baru: langsung buat sejumlah eksemplar.
   jumlah_eksemplar: z.number().int().min(0).max(500).optional().nullable(),
+  // Kode eksemplar/barcode awal yang diketik petugas (mis. "240010001").
+  // Eksemplar dibuat mengikuti nilai ini, bukan kode buku otomatis.
+  kode_eksemplar_awal: z.string().trim().min(1).max(64).optional().nullable(),
 });
+
+/**
+ * Buat deretan kode eksemplar mulai dari kode yang diinput petugas.
+ * "240010001" -> 240010001, 240010002, ...  ("A/12" -> "A/12", "A/13").
+ * Bila tidak ada angka di akhir, tambahkan sufiks -0002 dst.
+ */
+function deretKodeEksemplar(awal: string, jumlah: number): string[] {
+  const base = awal.trim();
+  const m = base.match(/^(.*?)(\d+)$/);
+  if (!m) return Array.from({ length: jumlah }, (_, i) => (i === 0 ? base : `${base}-${String(i + 1).padStart(4, "0")}`));
+  const [, prefix, angka] = m;
+  const lebar = angka.length;
+  const mulai = Number(angka);
+  return Array.from(
+    { length: jumlah },
+    (_, i) => `${prefix}${String(mulai + i).padStart(lebar, "0")}`,
+  );
+}
 
 export const simpanBuku = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
