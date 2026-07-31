@@ -1,10 +1,10 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 
-export type Role = "super_admin" | "admin" | "admin_sementara" | "mahasiswa";
+export type Role = "super_admin" | "admin" | "mahasiswa";
 
-export const ROLE_PRIORITY: Role[] = ["super_admin", "admin", "admin_sementara", "mahasiswa"];
-export const STAFF_ROLES: Role[] = ["super_admin", "admin", "admin_sementara"];
+export const ROLE_PRIORITY: Role[] = ["super_admin", "admin", "mahasiswa"];
+export const STAFF_ROLES: Role[] = ["super_admin", "admin"];
 
 export type Profile = {
   id: string;
@@ -15,8 +15,7 @@ export type Profile = {
   is_profile_completed: boolean;
 };
 
-// Menentukan peran tertinggi yang MASIH BERLAKU (mengabaikan admin_sementara
-// yang sudah kedaluwarsa), konsisten dengan has_role()/is_staff() di DB.
+// Menentukan peran tertinggi yang masih berlaku.
 function pilihRole(rows: { role: string; expires_at: string | null }[] | null): Role | null {
   if (!rows) return null;
   const now = Date.now();

@@ -46,7 +46,6 @@ export function TambahMahasiswaDialog({
   const [nama, setNama] = useState("");
   const [nim, setNim] = useState("");
   const [prodi, setProdi] = useState("");
-  const [email, setEmail] = useState("");
   const [busy, setBusy] = useState(false);
 
   async function simpan(e: React.FormEvent) {
@@ -57,18 +56,15 @@ export function TambahMahasiswaDialog({
     setBusy(true);
     try {
       const m = (await tambah({
-        data: { nama: nama.trim(), nim, prodi, email: email.trim() },
+        data: { nama: nama.trim(), nim, prodi },
       })) as MahasiswaBaru;
-      toast.success(`Mahasiswa ${m.nama} ditambahkan. Sandi awal: ${m.sandi}`, {
-        duration: 15000,
-      });
-      qc.invalidateQueries({ queryKey: ["mahasiswa"] });
+      toast.success(`Data mahasiswa ${m.nama} berhasil ditambahkan.`);
+      qc.invalidateQueries({ queryKey: ["mhs-list"] });
       onCreated?.(m);
       setOpen(false);
       setNama("");
       setNim("");
       setProdi("");
-      setEmail("");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Gagal menambahkan mahasiswa.");
     } finally {
@@ -85,9 +81,9 @@ export function TambahMahasiswaDialog({
       </DialogTrigger>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Tambah mahasiswa</DialogTitle>
+          <DialogTitle>Tambah data mahasiswa</DialogTitle>
           <DialogDescription>
-            Akun dibuat otomatis dengan sandi sementara yang ditampilkan setelah tersimpan.
+            Tambahkan data mahasiswa untuk keperluan pencatatan peminjaman buku.
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={simpan} className="space-y-3">
@@ -127,18 +123,6 @@ export function TambahMahasiswaDialog({
                 </option>
               ))}
             </select>
-          </div>
-          <div className="space-y-1">
-            <Label htmlFor="tm-email" className="text-xs">
-              Email (opsional)
-            </Label>
-            <Input
-              id="tm-email"
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder={nim ? `${nim}@mhs.fisip.ulm.ac.id` : "otomatis dari NIM"}
-            />
           </div>
           <DialogFooter>
             <Button type="submit" disabled={busy}>

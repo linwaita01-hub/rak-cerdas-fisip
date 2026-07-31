@@ -48,7 +48,6 @@ export const META_DIKENAL = [
   "tanggal",
   "sumber_perolehan",
   "sumber_sumbangan",
-  "catatan",
   "foto",
 ];
 
@@ -77,7 +76,6 @@ export const KOLOM_KATALOG: { label: string; get: (b: BukuKatalog) => string | n
   { label: "Tanggal", get: (b) => m(b, "tanggal") },
   { label: "Sumber perolehan", get: (b) => m(b, "sumber_perolehan") },
   { label: "Sumber sumbangan", get: (b) => m(b, "sumber_sumbangan") },
-  { label: "Catatan", get: (b) => m(b, "catatan") },
   { label: "Lokasi rak", get: (b) => b.lokasi_rak },
   { label: "Deskripsi", get: (b) => b.deskripsi },
 ];

@@ -471,6 +471,7 @@ const imporRow = z.object({
   deskripsi: z.string().nullish(),
   jumlah_eksemplar: z.number().int().min(0).max(200).nullish(),
   meta: z.record(z.string(), z.string()).nullish(),
+  sampul_path: z.string().nullish(),
 });
 
 export const imporBukuMassal = createServerFn({ method: "POST" })
@@ -511,6 +512,7 @@ export const imporBukuMassal = createServerFn({ method: "POST" })
         kategori: r.kategori ?? null,
         lokasi_rak: r.lokasi_rak ?? null,
         deskripsi: r.deskripsi ?? null,
+        sampul_path: r.sampul_path ?? null,
         meta: r.meta ?? {},
       };
       const existingId = existingMap.get(r.kode_buku);

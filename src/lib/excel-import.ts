@@ -87,6 +87,7 @@ const META_SYN: Record<string, string[]> = {
   jenis_koleksi: ["jeniskoleksi"],
   kode_inventaris: ["kodeinventaris", "noinventaris"],
   foto: ["fotobuku", "foto", "sampul", "gambar"],
+  catatan: ["catatan"],
   bentuk_fisik: ["bentukfisik", "bentukfisikkoleksi", "bentukfisikkolkesi"],
   deskripsi_fisik: ["deskripsifisik"],
   kata_kunci: ["infodetailspesifik", "katakunci", "infodetail"],
@@ -182,6 +183,10 @@ function toStr(v: unknown): string | null {
   const s = String(v).trim();
   return s === "" || s === "-" ? null : s;
 }
+function toStrCode(v: unknown): string | null {
+  const s = toStr(v);
+  return s?.replace(/\.0$/, "") ?? null;
+}
 function toInt(v: unknown): number | null {
   if (v == null || v === "") return null;
   const n = Number(String(v).replace(/[^\d-]/g, ""));
@@ -242,7 +247,7 @@ export async function parseExcelFile(file: File): Promise<{ sheets: SheetPreview
       const nonEmpty = r.filter((c) => c != null && String(c).trim() !== "").length;
       if (nonEmpty < 2) continue;
       const judul = toStr(r[columnMap.judul ?? -1]);
-      const kode = toStr(r[columnMap.kode_buku ?? -1]);
+      const kode = toStrCode(r[columnMap.kode_buku ?? -1]);
       if (!judul) continue;
 
       const jml = toInt(r[columnMap.jumlah_eksemplar ?? -1]);
@@ -250,12 +255,12 @@ export async function parseExcelFile(file: File): Promise<{ sheets: SheetPreview
         _sheet: name,
         _row: i + 1,
         kode_buku: kode ?? `${name.slice(0, 6).replace(/\s+/g, "")}-${i + 1}`,
-        barcode_value: toStr(r[columnMap.barcode_value ?? -1]),
+        barcode_value: toStrCode(r[columnMap.barcode_value ?? -1]),
         judul,
         pengarang: toStr(r[columnMap.pengarang ?? -1]),
         penerbit: toStr(r[columnMap.penerbit ?? -1]),
         tahun_terbit: toInt(r[columnMap.tahun_terbit ?? -1]),
-        isbn: toStr(r[columnMap.isbn ?? -1]),
+        isbn: toStrCode(r[columnMap.isbn ?? -1]),
         kategori: toStr(r[columnMap.kategori ?? -1]),
         lokasi_rak: toStr(r[columnMap.lokasi_rak ?? -1]),
         deskripsi: toStr(r[columnMap.deskripsi ?? -1]),
@@ -272,6 +277,7 @@ export async function parseExcelFile(file: File): Promise<{ sheets: SheetPreview
         const val = toStr(r[j]);
         if (val == null) continue;
         const key = metaKey(effectiveHeader[j] ?? "") ?? `kolom_${j + 1}`;
+        if (key === "catatan") continue;
         if (!(key in meta)) meta[key] = val;
       }
       if (Object.keys(meta).length) row.meta = meta;

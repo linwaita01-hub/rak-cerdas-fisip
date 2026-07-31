@@ -3,13 +3,10 @@ import { supabase } from "@/integrations/supabase/client";
 import { useMe } from "@/hooks/useMe";
 import { BrandHeader } from "@/components/BrandHeader";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Loader2, LogOut } from "lucide-react";
 import { toast } from "sonner";
 import { StaffDashboard } from "@/components/dashboard/StaffDashboard";
-import { MahasiswaDashboard } from "@/components/dashboard/MahasiswaDashboard";
 import { PushToggle } from "@/components/PushToggle";
-import { useEffect } from "react";
 
 export const Route = createFileRoute("/_authenticated/app")({
   component: AppHome,
@@ -18,13 +15,7 @@ export const Route = createFileRoute("/_authenticated/app")({
 
 function AppHome() {
   const navigate = useNavigate();
-  const { profile, role, isStaff, loading } = useMe();
-
-  useEffect(() => {
-    if (!loading && profile && !profile.is_profile_completed && role === "mahasiswa") {
-      navigate({ to: "/lengkapi-profil" });
-    }
-  }, [loading, profile, role, navigate]);
+  const { profile, loading } = useMe();
 
   async function onLogout() {
     await supabase.auth.signOut();
@@ -48,12 +39,9 @@ function AppHome() {
             <BrandHeader />
           </Link>
           <div className="flex items-center gap-2">
-            <div className="hidden text-right sm:block">
-              <p className="text-sm font-medium">{profile?.nama ?? profile?.email}</p>
-              <Badge variant="secondary" className="capitalize text-[10px]">
-                {role?.replace("_", " ")}
-              </Badge>
-            </div>
+            <p className="hidden text-sm font-medium sm:block">
+              {profile?.nama ?? profile?.email}
+            </p>
             <PushToggle />
             <Button variant="ghost" size="sm" onClick={onLogout}>
               <LogOut className="mr-2 h-4 w-4" /> Keluar
@@ -63,7 +51,7 @@ function AppHome() {
       </header>
 
       <main className="mx-auto max-w-7xl px-4 py-6">
-        {isStaff ? <StaffDashboard /> : <MahasiswaDashboard profile={profile} />}
+        <StaffDashboard />
       </main>
     </div>
   );

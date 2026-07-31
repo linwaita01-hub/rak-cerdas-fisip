@@ -50,9 +50,7 @@ import { toast } from "sonner";
 import { Barcode } from "@/components/Barcode";
 import { BarcodeScannerInput } from "@/components/BarcodeScannerInput";
 import { cariEksemplarDariScan, normalisasiBarcode } from "@/lib/barcode-lookup";
-
-import { fmtIDR, fmtWITA, useMe } from "@/hooks/useMe";
-import { AdminSementaraPanel } from "@/components/dashboard/AdminSementaraPanel";
+import { fmtIDR, fmtWITA } from "@/hooks/useMe";
 import { FotoField } from "@/components/katalog/FotoField";
 import {
   mulaiPeminjamanMeja,
@@ -69,16 +67,13 @@ import {
 } from "@/lib/perpus.functions";
 
 export function StaffDashboard() {
-  const { role } = useMe();
-  const isSuperAdmin = role === "super_admin";
   return (
     <Tabs defaultValue="transaksi" className="w-full">
-      <TabsList className={`grid w-full ${isSuperAdmin ? "grid-cols-5" : "grid-cols-4"} sm:w-auto`}>
+      <TabsList className="grid w-full grid-cols-4 sm:w-auto">
         <TabsTrigger value="transaksi">Transaksi</TabsTrigger>
         <TabsTrigger value="inventaris">Inventaris</TabsTrigger>
-        <TabsTrigger value="mahasiswa">Mahasiswa</TabsTrigger>
+        <TabsTrigger value="mahasiswa">Data Mahasiswa</TabsTrigger>
         <TabsTrigger value="pengaturan">Pengaturan</TabsTrigger>
-        {isSuperAdmin && <TabsTrigger value="super">Super Admin</TabsTrigger>}
       </TabsList>
       <TabsContent value="transaksi" className="mt-4">
         <TabTransaksi />
@@ -92,11 +87,6 @@ export function StaffDashboard() {
       <TabsContent value="pengaturan" className="mt-4">
         <TabPengaturan />
       </TabsContent>
-      {isSuperAdmin && (
-        <TabsContent value="super" className="mt-4">
-          <AdminSementaraPanel />
-        </TabsContent>
-      )}
     </Tabs>
   );
 }
@@ -598,7 +588,34 @@ function TabInventaris() {
           }}
         />
         <span>Pilih Semua</span>
-        {picked.size > 0 && <span className="text-muted-foreground">— {picked.size} dipilih</span>}
+        {picked.size > 0 && (
+          <>
+            <span className="text-muted-foreground">— {picked.size} dipilih</span>
+            <Button
+              size="sm"
+              variant="destructive"
+              className="ml-auto"
+              onClick={async () => {
+                if (!confirm(`Hapus ${picked.size} buku yang dipilih?`)) return;
+                let ok = 0;
+                for (const id of picked) {
+                  try {
+                    await hapus({ data: { id } });
+                    ok++;
+                  } catch {
+                    /* skip */
+                  }
+                }
+                toast.success(`${ok} buku dihapus.`);
+                setPicked(new Set());
+                qc.invalidateQueries({ queryKey: ["buku-list"] });
+              }}
+            >
+              <Trash2 className="mr-1 h-4 w-4" />
+              Hapus dipilih
+            </Button>
+          </>
+        )}
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -752,7 +769,6 @@ const META_FIELD_KEYS = [
   "subjek",
   "bahasa",
   "sumber_perolehan",
-  "catatan",
   "sumber_sumbangan",
 ];
 
@@ -785,7 +801,6 @@ const BUKU_FIELDS: FieldDef[] = [
   { key: "sumber_perolehan", label: "Sumber Perolehan" },
   { key: "sumber_sumbangan", label: "Sumber Sumbangan" },
   { key: "kata_kunci", label: "Kata Kunci", full: true },
-  { key: "catatan", label: "Catatan", full: true, type: "textarea" },
   { key: "deskripsi", label: "Deskripsi", full: true, type: "textarea" },
   { key: "sampul_path", label: "Foto (URL sampul)", full: true },
 ];
@@ -1026,14 +1041,14 @@ function PrintLabels({ items, buku, onClose }: { items: any[]; buku: any; onClos
   );
 }
 
-// ============= TAB MAHASISWA =============
+// ============= TAB DATA MAHASISWA =============
 function TabMahasiswa() {
   const [search, setSearch] = useState("");
   const list = useQuery({
     queryKey: ["mhs-list", search],
     queryFn: async () => {
       let q = supabase.from("profiles").select("id, nama, nim, prodi, email").order("nama");
-      if (search) q = q.or(`nama.ilike.%${search}%,nim.ilike.%${search}%,email.ilike.%${search}%`);
+      if (search) q = q.or(`nama.ilike.%${search}%,nim.ilike.%${search}%`);
       const { data, error } = await q.limit(200);
       if (error) throw error;
       return data ?? [];
@@ -1042,14 +1057,17 @@ function TabMahasiswa() {
 
   return (
     <div className="space-y-4">
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-        <Input
-          placeholder="Cari nama / NIM / email…"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="pl-9"
-        />
+      <div className="flex items-center gap-2">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            placeholder="Cari nama / NIM…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="pl-9"
+          />
+        </div>
+        <TambahMahasiswaDialog />
       </div>
       <Card>
         <CardContent className="pt-6">
@@ -1059,18 +1077,20 @@ function TabMahasiswa() {
                 <TableHead>Nama</TableHead>
                 <TableHead>NIM</TableHead>
                 <TableHead>Prodi</TableHead>
-                <TableHead>Email</TableHead>
-                <TableHead>Kelayakan</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {list.data?.map((m) => (
-                <MahasiswaRow key={m.id} m={m} />
+                <TableRow key={m.id}>
+                  <TableCell>{m.nama ?? "—"}</TableCell>
+                  <TableCell className="font-mono text-xs">{m.nim ?? "—"}</TableCell>
+                  <TableCell className="text-sm">{m.prodi ?? "—"}</TableCell>
+                </TableRow>
               ))}
               {!list.data?.length && (
                 <TableRow>
-                  <TableCell colSpan={5} className="text-center text-sm text-muted-foreground">
-                    Tidak ada mahasiswa.
+                  <TableCell colSpan={3} className="text-center text-sm text-muted-foreground">
+                    Tidak ada data mahasiswa.
                   </TableCell>
                 </TableRow>
               )}
@@ -1079,27 +1099,6 @@ function TabMahasiswa() {
         </CardContent>
       </Card>
     </div>
-  );
-}
-
-function MahasiswaRow({ m }: { m: any }) {
-  const q = useQuery({
-    queryKey: ["kelayakan", m.id],
-    queryFn: async () => {
-      const { data } = await supabase.rpc("mahasiswa_layak_pinjam", { _user_id: m.id });
-      return !!data;
-    },
-  });
-  return (
-    <TableRow>
-      <TableCell>{m.nama ?? "—"}</TableCell>
-      <TableCell className="font-mono text-xs">{m.nim ?? "—"}</TableCell>
-      <TableCell className="text-sm">{m.prodi ?? "—"}</TableCell>
-      <TableCell className="text-sm">{m.email ?? "—"}</TableCell>
-      <TableCell>
-        <Badge variant={q.data ? "default" : "destructive"}>{q.data ? "Layak" : "Diblokir"}</Badge>
-      </TableCell>
-    </TableRow>
   );
 }
 

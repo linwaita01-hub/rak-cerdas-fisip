@@ -24,6 +24,7 @@ import { Badge } from "@/components/ui/badge";
 import { Loader2, Upload, History, RotateCcw, Plus, Download } from "lucide-react";
 import { toast } from "sonner";
 import { parseExcelFile, eksporBukuKeExcel, type SheetPreview } from "@/lib/excel-import";
+import { parseImagesTina } from "@/lib/excel-images";
 import { imporBukuMassal, kembalikanVersiBuku } from "@/lib/perpus.functions";
 import { fmtWITA } from "@/hooks/useMe";
 
@@ -112,7 +113,10 @@ export function ImportBukuButton() {
   const [pickedSheet, setPickedSheet] = useState<string>("");
   const [askDup, setAskDup] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [progress, setProgress] = useState("");
   const [editRows, setEditRows] = useState<EditRow[]>([]);
+  // Foto tertanam dari file .xlsx dipetakan ke kode_buku (kolom unik).
+  const [imagesByKode, setImagesByKode] = useState<Map<string, Blob>>(new Map());
   const impor = useServerFn(imporBukuMassal);
   const qc = useQueryClient();
 
@@ -122,6 +126,24 @@ export function ImportBukuButton() {
       const { sheets } = await parseExcelFile(file);
       const good = sheets.filter((s) => s.rows.length > 0);
       if (!good.length) throw new Error("Tidak menemukan sheet berisi data buku.");
+
+      // Coba parse gambar tertanam (hanya untuk sheet Tina; sheet lain diabaikan).
+      let imgMap = new Map<string, Blob>();
+      try {
+        const images = await parseImagesTina(file);
+        const sheetTina =
+          good.find((s) => /FISIP\s+Lengkap\s*\(\s*Tina\s*\)/i.test(s.sheetName)) ?? good[0];
+        for (const img of images) {
+          const row = sheetTina.rows.find((r) => (r._row ?? 0) - 1 === img.rowIndex);
+          if (row?.kode_buku) imgMap.set(row.kode_buku, img.blob);
+        }
+      } catch {
+        imgMap = new Map();
+      }
+      setImagesByKode(imgMap);
+      if (imgMap.size > 0) {
+        toast.info(`${imgMap.size} foto tertanam terdeteksi — akan diunggah saat impor.`);
+      }
       setSheets(good);
       setPickedSheet(good[0].sheetName);
     } catch (e) {
@@ -130,6 +152,38 @@ export function ImportBukuButton() {
       setBusy(false);
       if (fileRef.current) fileRef.current.value = "";
     }
+  }
+
+  // Unggah gambar ke bucket 'sampul' dengan concurrency terbatas; kembalikan
+  // path per kode_buku (yang berhasil). Yang gagal (mis. bucket belum dibuat)
+  // dilewati diam-diam agar impor tetap berjalan.
+  async function uploadImages(kodes: string[]): Promise<Map<string, string>> {
+    const paths = new Map<string, string>();
+    const tasks = kodes
+      .map((k) => ({ k, blob: imagesByKode.get(k) }))
+      .filter((x): x is { k: string; blob: Blob } => !!x.blob);
+    if (tasks.length === 0) return paths;
+    let gagal = 0;
+    const worker = async () => {
+      while (tasks.length) {
+        const t = tasks.shift();
+        if (!t) return;
+        const ext = t.blob.type.includes("png") ? "png" : t.blob.type.includes("gif") ? "gif" : "jpg";
+        const safe = t.k.replace(/[^a-zA-Z0-9._-]/g, "_").slice(0, 40);
+        const path = `${safe}/${crypto.randomUUID()}.${ext}`;
+        const { error } = await supabase.storage
+          .from("sampul")
+          .upload(path, t.blob, { contentType: t.blob.type, upsert: true });
+        if (error) gagal++;
+        else paths.set(t.k, path);
+      }
+    };
+    // Concurrency 6 upload sekaligus.
+    await Promise.all(Array.from({ length: 6 }, () => worker()));
+    if (gagal > 0) {
+      toast.warning(`${gagal} foto gagal diunggah (bucket 'sampul' mungkin belum tersedia).`);
+    }
+    return paths;
   }
 
   const active = sheets?.find((s) => s.sheetName === pickedSheet);
@@ -159,8 +213,9 @@ export function ImportBukuButton() {
   async function jalankan(mode: "skip" | "overwrite") {
     if (!active) return;
     setBusy(true);
+    setProgress("Menyiapkan data…");
     try {
-      const rowsClean = editRows
+      const rowsBase = editRows
         .filter((r) => r.kode_buku && r.judul)
         .map((r) => ({
           kode_buku: r.kode_buku as string,
@@ -174,12 +229,22 @@ export function ImportBukuButton() {
           jumlah_eksemplar: r.jumlah_eksemplar ?? 1,
           meta: r.meta,
         }));
-      // Kirim per-batch 500
+
+      const kodes = rowsBase.map((r) => r.kode_buku);
+      if (imagesByKode.size > 0) {
+        setProgress(`Mengunggah ${imagesByKode.size} foto…`);
+      }
+      const paths = await uploadImages(kodes);
+      const rowsClean = rowsBase.map((r) => ({ ...r, sampul_path: paths.get(r.kode_buku) ?? null }));
+
       let inserted = 0,
         updated = 0,
         skipped = 0,
         eks = 0;
+      const totalBatches = Math.ceil(rowsClean.length / 500);
       for (let i = 0; i < rowsClean.length; i += 500) {
+        const batchNum = Math.floor(i / 500) + 1;
+        setProgress(`Mengimpor batch ${batchNum}/${totalBatches} (${i}/${rowsClean.length} baris)…`);
         const chunk = rowsClean.slice(i, i + 500);
         const r = await impor({ data: { mode, rows: chunk } });
         inserted += r.inserted;
@@ -197,6 +262,7 @@ export function ImportBukuButton() {
       toast.error(e instanceof Error ? e.message : "Gagal impor.");
     } finally {
       setBusy(false);
+      setProgress("");
     }
   }
 
@@ -302,6 +368,12 @@ export function ImportBukuButton() {
           <p className="text-sm text-muted-foreground">
             Pilih tindakan untuk baris yang <b>kode_buku</b>-nya sudah ada di database.
           </p>
+          {progress && (
+            <div className="flex items-center gap-2 rounded bg-muted px-3 py-2 text-sm">
+              <Loader2 className="h-4 w-4 animate-spin shrink-0" />
+              {progress}
+            </div>
+          )}
           <DialogFooter className="flex-col gap-2 sm:flex-row">
             <Button
               variant="outline"
