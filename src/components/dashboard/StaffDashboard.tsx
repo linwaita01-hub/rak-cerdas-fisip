@@ -877,7 +877,7 @@ function BukuForm({ initial, onSubmit }: { initial: any; onSubmit: (v: any) => P
       ))}
       {!initial.id && (
         <div className="space-y-1">
-          <Label>Jumlah eksemplar (dibuat otomatis)</Label>
+          <Label>Jumlah eksemplar (kode mengikuti Kode Barcot)</Label>
           <Input
             type="number"
             min={0}
