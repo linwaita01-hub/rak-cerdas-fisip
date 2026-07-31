@@ -3,6 +3,8 @@ import { z } from "zod";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import type { Database } from "@/integrations/supabase/types";
+import { cariEksemplarDariScan } from "@/lib/barcode-lookup";
+
 
 // ============= Helper =============
 async function ensureStaff(context: { supabase: SupabaseClient<Database>; userId: string }) {
@@ -80,15 +82,10 @@ export const mulaiPeminjamanMeja = createServerFn({ method: "POST" })
     });
     if (!layak) throw new Error("Mahasiswa memiliki denda belum lunas atau peminjaman terlambat.");
 
-    // Cari eksemplar dari barcode.
-    const { data: eks, error: e1 } = await context.supabase
-      .from("eksemplar")
-      .select("id, buku_id, status")
-      .eq("barcode_value", data.barcode)
-      .is("deleted_at", null)
-      .maybeSingle();
-    if (e1) throw new Error(e1.message);
+    // Cari eksemplar dari barcode (toleran spasi/kapital & kode buku).
+    const eks = await cariEksemplarDariScan(context.supabase, data.barcode);
     if (!eks) throw new Error("Barcode eksemplar tidak dikenali.");
+
 
     // Kunci eksemplar secara atomik: tersedia → dipinjam.
     const { data: held, error: eHold } = await context.supabase
@@ -131,13 +128,9 @@ export const kembalikanBarcode = createServerFn({ method: "POST" })
   .inputValidator((d) => z.object({ barcode: z.string().min(1) }).parse(d))
   .handler(async ({ data, context }) => {
     await ensureStaff(context);
-    const { data: eks, error: e1 } = await context.supabase
-      .from("eksemplar")
-      .select("*")
-      .eq("barcode_value", data.barcode)
-      .maybeSingle();
-    if (e1) throw new Error(e1.message);
+    const eks = await cariEksemplarDariScan(context.supabase, data.barcode);
     if (!eks) throw new Error("Barcode tidak dikenali.");
+
 
     const { data: p, error: e2 } = await context.supabase
       .from("peminjaman")

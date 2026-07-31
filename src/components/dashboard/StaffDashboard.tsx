@@ -49,6 +49,8 @@ import {
 import { toast } from "sonner";
 import { Barcode } from "@/components/Barcode";
 import { BarcodeScannerInput } from "@/components/BarcodeScannerInput";
+import { cariEksemplarDariScan, normalisasiBarcode } from "@/lib/barcode-lookup";
+
 import { fmtIDR, fmtWITA, useMe } from "@/hooks/useMe";
 import { AdminSementaraPanel } from "@/components/dashboard/AdminSementaraPanel";
 import { FotoField } from "@/components/katalog/FotoField";
@@ -369,21 +371,22 @@ function PinjamMejaCard() {
   const [busy, setBusy] = useState(false);
 
   async function onScan(code: string) {
-    setBarcode(code);
-    const { data } = await supabase
-      .from("eksemplar")
-      .select("status, buku:buku_id(judul, kode_buku)")
-      .eq("barcode_value", code)
-      .is("deleted_at", null)
-      .maybeSingle();
-    if (!data) {
+    const eks = await cariEksemplarDariScan(supabase, code);
+    if (!eks) {
+      setBarcode("");
       setBuku(null);
-      toast.error("Barcode eksemplar tidak dikenali.");
+      toast.error(`Barcode "${normalisasiBarcode(code)}" tidak ditemukan di inventaris.`);
       return;
     }
-    const b = data.buku as unknown as { judul: string | null; kode_buku: string | null } | null;
-    setBuku({ judul: b?.judul ?? "—", kode: b?.kode_buku ?? "—", status: data.status });
+    setBarcode(eks.barcode_value ?? eks.kode_eksemplar ?? normalisasiBarcode(code));
+    const { data: b } = await supabase
+      .from("buku")
+      .select("judul, kode_buku")
+      .eq("id", eks.buku_id)
+      .maybeSingle();
+    setBuku({ judul: b?.judul ?? "—", kode: b?.kode_buku ?? "—", status: eks.status });
   }
+
 
   // Tangkap scan global (scanner mengetik walau kolom tak difokuskan).
   useGlobalScan(onScan);
