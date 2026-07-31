@@ -288,16 +288,19 @@ export const simpanBuku = createServerFn({ method: "POST" })
     if (!row) throw new Error("Gagal membuat kode buku unik. Coba lagi.");
 
     // Buat eksemplar awal untuk buku baru.
-    if (jumlah_eksemplar && jumlah_eksemplar > 0) {
-      const eks = Array.from({ length: jumlah_eksemplar }, (_, i) => {
-        const kode = `${kodeFinal}-${String(i + 1).padStart(4, "0")}`;
-        return {
-          buku_id: row.id,
-          kode_eksemplar: kode,
-          barcode_value: kode,
-          status: "tersedia" as const,
-        };
-      });
+    // Kode mengikuti "Kode Barcot / Eksemplar" yang diinput petugas bila ada.
+    const awal = kode_eksemplar_awal?.trim();
+    const jml = jumlah_eksemplar && jumlah_eksemplar > 0 ? jumlah_eksemplar : awal ? 1 : 0;
+    if (jml > 0) {
+      const kodeList = awal
+        ? deretKodeEksemplar(awal, jml)
+        : Array.from({ length: jml }, (_, i) => `${kodeFinal}-${String(i + 1).padStart(4, "0")}`);
+      const eks = kodeList.map((kode) => ({
+        buku_id: row.id,
+        kode_eksemplar: kode,
+        barcode_value: kode,
+        status: "tersedia" as const,
+      }));
       const { error: eErr } = await context.supabase.from("eksemplar").insert(eks);
       if (eErr) throw new Error("Buku tersimpan, tapi gagal membuat eksemplar: " + eErr.message);
     }
