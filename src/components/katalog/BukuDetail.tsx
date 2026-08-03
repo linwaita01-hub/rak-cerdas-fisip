@@ -5,7 +5,7 @@ import { SampulImg } from "@/components/katalog/SampulImg";
 /** Menampilkan SELURUH informasi buku (kolom sheet-7-tina) + pratinjau foto. */
 export function BukuDetail({ buku }: { buku: BukuKatalog }) {
   const foto = fotoRaw(buku);
-  const { tersedia, total } = ketersediaan(buku);
+  const { tersedia } = ketersediaan(buku);
   const baris = KOLOM_KATALOG.map((k) => ({ label: k.label, value: k.get(buku) })).filter(
     (r) => r.value != null && r.value !== "",
   );
@@ -23,7 +23,7 @@ export function BukuDetail({ buku }: { buku: BukuKatalog }) {
         </div>
         <div className="mt-2">
           <Badge variant={tersedia > 0 ? "default" : "destructive"}>
-            {tersedia}/{total} tersedia
+            {tersedia > 0 ? "Tersedia" : "Tidak tersedia"}
           </Badge>
         </div>
       </div>

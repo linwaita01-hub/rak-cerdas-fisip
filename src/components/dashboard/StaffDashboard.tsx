@@ -63,7 +63,6 @@ import {
   simpanBuku,
   hapusBuku,
   tambahEksemplar,
-  tambahEksemplarSatu,
   hapusEksemplar,
   ubahStatusEksemplar,
   simpanPengaturan,
@@ -843,7 +842,6 @@ const BUKU_FIELDS: FieldDef[] = [
 ];
 
 function TambahBukuTabs({ onSelesai }: { onSelesai: () => void }) {
-  const [tab, setTab] = useState<"baru" | "dari-ada">("baru");
   const qc = useQueryClient();
   const simpan = useServerFn(simpanBuku);
   return (
@@ -851,165 +849,22 @@ function TambahBukuTabs({ onSelesai }: { onSelesai: () => void }) {
       <DialogHeader>
         <DialogTitle>Tambah buku</DialogTitle>
       </DialogHeader>
-      <Tabs value={tab} onValueChange={(t) => setTab(t as any)}>
-        <TabsList className="w-full">
-          <TabsTrigger value="baru" className="flex-1">Buku Baru</TabsTrigger>
-          <TabsTrigger value="dari-ada" className="flex-1">Dari Buku yang Ada</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="baru" className="mt-3">
-          <BukuForm
-            initial={{}}
-            onSubmit={async (v) => {
-              try {
-                await simpan({ data: v });
-                toast.success("Buku baru tersimpan.");
-                qc.invalidateQueries({ queryKey: ["buku-list"] });
-                onSelesai();
-              } catch (e) {
-                toast.error(e instanceof Error ? e.message : "Gagal.");
-              }
-            }}
-          />
-        </TabsContent>
-
-        <TabsContent value="dari-ada" className="mt-3">
-          <TambahEksemplarPanel onSelesai={onSelesai} />
-        </TabsContent>
-      </Tabs>
-    </>
-  );
-}
-
-function TambahEksemplarPanel({ onSelesai }: { onSelesai: () => void }) {
-  const [sumber, setSumber] = useState<{ id: string; judul: string; count: number } | null>(null);
-  const [cari, setCari] = useState("");
-  const [showSaran, setShowSaran] = useState(false);
-  const [barcode, setBarcode] = useState("");
-  const [saving, setSaving] = useState(false);
-  const tambah = useServerFn(tambahEksemplarSatu);
-  const qc = useQueryClient();
-
-  const saranBuku = useQuery({
-    queryKey: ["saran-judul-eks", cari],
-    enabled: cari.length >= 2 && !sumber,
-    queryFn: async () => {
-      const s = cari.trim().replace(/[%,]/g, "");
-      const { data } = await supabase
-        .from("buku")
-        .select("id, judul, pengarang, penerbit, tahun_terbit, eksemplar(id)")
-        .ilike("judul", `%${s}%`)
-        .limit(8);
-      return data ?? [];
-    },
-  });
-
-  async function simpan(e: React.FormEvent) {
-    e.preventDefault();
-    if (!sumber) return;
-    const b = barcode.trim();
-    if (!b) return toast.error("Barcode wajib diisi.");
-    setSaving(true);
-    try {
-      await tambah({ data: { buku_id: sumber.id, barcode: b } });
-      toast.success(`Eksemplar baru ditambahkan ke "${sumber.judul}".`);
-      qc.invalidateQueries({ queryKey: ["buku-list"] });
-      onSelesai();
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Gagal.");
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  if (!sumber) {
-    return (
-      <div className="space-y-2">
-        <Label>Cari judul buku yang sudah ada</Label>
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            value={cari}
-            onChange={(e) => { setCari(e.target.value); setShowSaran(true); }}
-            onFocus={() => cari.length >= 2 && setShowSaran(true)}
-            placeholder="Ketik judul buku…"
-            className="pl-9"
-          />
-        </div>
-        {showSaran && cari.length >= 2 && (
-          <div className="max-h-60 overflow-auto rounded-md border">
-            {saranBuku.isFetching && (
-              <div className="flex items-center gap-2 p-3 text-sm text-muted-foreground">
-                <Loader2 className="h-3 w-3 animate-spin" /> Mencari…
-              </div>
-            )}
-            {saranBuku.data?.map((b: any) => {
-              const jumlah = Array.isArray(b.eksemplar) ? b.eksemplar.length : 0;
-              return (
-                <button
-                  key={b.id}
-                  type="button"
-                  onClick={() => { setSumber({ id: b.id, judul: b.judul, count: jumlah }); setShowSaran(false); }}
-                  className="flex w-full items-center gap-2 border-b p-3 text-left text-sm last:border-0 hover:bg-accent"
-                >
-                  <div className="flex-1">
-                    <div className="font-medium">{b.judul}</div>
-                    <div className="text-xs text-muted-foreground">
-                      {[b.pengarang, b.penerbit, b.tahun_terbit].filter(Boolean).join(" · ")}
-                    </div>
-                  </div>
-                  <Badge variant="secondary" className="shrink-0">{jumlah} eksemplar</Badge>
-                </button>
-              );
-            })}
-            {!saranBuku.isFetching && !saranBuku.data?.length && (
-              <p className="p-3 text-sm text-muted-foreground">Tidak ada buku cocok.</p>
-            )}
-          </div>
-        )}
-        <p className="text-xs text-muted-foreground">
-          Pilih buku — tinggal input barcode baru untuk eksemplar tambahan (+1).
-        </p>
-      </div>
-    );
-  }
-
-  return (
-    <form onSubmit={simpan} className="space-y-3">
-      <div className="flex items-center justify-between rounded-md border bg-muted/40 p-3">
-        <div className="flex items-center gap-2">
-          <BookOpen className="h-4 w-4 text-primary" />
-          <div>
-            <div className="text-sm font-medium">{sumber.judul}</div>
-            <div className="text-xs text-muted-foreground">Sekarang {sumber.count} eksemplar</div>
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
-          <Badge className="bg-emerald-600 hover:bg-emerald-600">+1</Badge>
-          <Button size="sm" variant="ghost" type="button" onClick={() => { setSumber(null); setBarcode(""); }}>
-            <X className="mr-1 h-3 w-3" /> Ganti
-          </Button>
-        </div>
-      </div>
-      <div className="space-y-1">
-        <Label htmlFor="tek-barcode">Kode Barcot / Barcode eksemplar baru *</Label>
-        <Input
-          id="tek-barcode"
-          autoFocus
-          value={barcode}
-          onChange={(e) => setBarcode(e.target.value)}
-          placeholder="Scan / ketik barcode…"
+      <div className="mt-2">
+        <BukuForm
+          initial={{}}
+          onSubmit={async (v) => {
+            try {
+              await simpan({ data: v });
+              toast.success("Buku baru tersimpan.");
+              qc.invalidateQueries({ queryKey: ["buku-list"] });
+              onSelesai();
+            } catch (e) {
+              toast.error(e instanceof Error ? e.message : "Gagal.");
+            }
+          }}
         />
-        <p className="text-xs text-muted-foreground">
-          Barcode wajib berbeda dari eksemplar lain — pakai barcode fisik pada buku baru.
-        </p>
       </div>
-      <DialogFooter>
-        <Button type="submit" disabled={saving || !barcode.trim()}>
-          {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Tambah eksemplar
-        </Button>
-      </DialogFooter>
-    </form>
+    </>
   );
 }
 

@@ -112,7 +112,7 @@ function KatalogPage() {
 
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {q.data?.map((b) => {
-            const { tersedia, total } = ketersediaan(b);
+            const { tersedia } = ketersediaan(b);
             const foto = fotoRaw(b);
             return (
               <Card key={b.id} className="overflow-hidden transition hover:shadow-md">
@@ -131,7 +131,7 @@ function KatalogPage() {
                         variant={tersedia > 0 ? "default" : "destructive"}
                         className="text-[10px]"
                       >
-                        {tersedia > 0 ? `🟩 ${tersedia}/${total}` : "🟥 Kosong"}
+                        {tersedia > 0 ? "🟩 Tersedia" : "🟥 Tidak tersedia"}
                       </Badge>
                       <Button
                         size="sm"

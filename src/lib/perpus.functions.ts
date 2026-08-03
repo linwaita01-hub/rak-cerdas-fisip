@@ -545,11 +545,6 @@ export const imporBukuMassal = createServerFn({ method: "POST" })
     // apa pun jumlah barisnya. Ini menghindari batas subrequest Cloudflare
     // Workers yang membuat impor besar (mis. 1500+ baris) gagal di tengah.
 
-    const norm = (s: string | null | undefined) =>
-      (s || "").toLowerCase().trim().replace(/\s+/g, " ");
-    const rowKey = (r: (typeof data.rows)[number]) =>
-      r.isbn && r.isbn.trim() ? `isbn:${norm(r.isbn)}` : `jp:${norm(r.judul)}|${norm(r.pengarang)}`;
-
     // Query .in() dipecah agar URL/pernyataan tidak kepanjangan.
     const chunkIn = async (
       table: string,
@@ -569,45 +564,20 @@ export const imporBukuMassal = createServerFn({ method: "POST" })
       return out;
     };
 
-    // 1) Kelompokkan baris → satu buku per grup, satu eksemplar per baris.
-    const groups = new Map<string, typeof data.rows>();
-    for (const r of data.rows) {
-      const k = rowKey(r);
-      const arr = groups.get(k);
-      if (arr) arr.push(r);
-      else groups.set(k, [r]);
-    }
-
-    // 2) Ambil buku yang sudah ada (by isbn / kode_buku / judul) — set-based.
-    const existingByKey = new Map<string, string>(); // rowKey → buku_id
-    const existingByKode = new Map<string, string>(); // kode_buku → buku_id
-    const kodeById = new Map<string, string>(); // buku_id → kode_buku (yang di DB)
-    const found = [
-      ...(await chunkIn(
-        "buku",
-        "isbn",
-        "id, kode_buku, isbn, judul, pengarang",
-        data.rows.map((r) => r.isbn).filter(Boolean) as string[],
-      )),
-      ...(await chunkIn(
-        "buku",
-        "kode_buku",
-        "id, kode_buku, isbn, judul, pengarang",
-        data.rows.map((r) => r.kode_buku),
-      )),
-      ...(await chunkIn(
-        "buku",
-        "judul",
-        "id, kode_buku, isbn, judul, pengarang",
-        data.rows.map((r) => r.judul),
-      )),
-    ];
-    for (const b of found) {
-      if (b.isbn) existingByKey.set(`isbn:${norm(b.isbn)}`, b.id);
-      existingByKey.set(`jp:${norm(b.judul)}|${norm(b.pengarang)}`, b.id);
-      existingByKode.set(b.kode_buku, b.id);
-      kodeById.set(b.id, b.kode_buku);
-    }
+    // Setiap baris = SATU buku (1 unit). TIDAK ada penggabungan judul: buku
+    // berjudul sama tetap jadi entri terpisah. Dedup/overwrite berbasis
+    // kode_buku (No. Inventaris — unik per baris di file). Satu eksemplar per
+    // buku (barcode dari file) agar scan peminjaman tetap jalan — tanpa
+    // menampilkan/melacak jumlah.
+    const foundExisting = await chunkIn(
+      "buku",
+      "kode_buku",
+      "id, kode_buku",
+      data.rows.map((r) => r.kode_buku),
+    );
+    const idByKodeDb = new Map<string, string>(
+      foundExisting.map((b: any) => [b.kode_buku, b.id]),
+    );
 
     const buatPayload = (rows: typeof data.rows) => {
       const first = rows[0];
@@ -626,22 +596,22 @@ export const imporBukuMassal = createServerFn({ method: "POST" })
       };
     };
 
-    // 3) Pisahkan grup: baru vs sudah ada. Dedup kode_buku antar-grup di batch.
+    // Pisahkan baris: baru vs sudah ada (by kode_buku). Dedup kode_buku dalam
+    // batch agar dua baris berkode sama tetap jadi entri terpisah.
     type Grp = { rows: typeof data.rows; id?: string };
     const baruGrp: Grp[] = [];
     const adaGrp: Grp[] = [];
-    const kodeDipakai = new Set(existingByKode.keys());
-    for (const [key, rows] of groups.entries()) {
-      const id = existingByKey.get(key) ?? existingByKode.get(rows[0].kode_buku);
+    const kodeDipakai = new Set(idByKodeDb.keys());
+    for (const r of data.rows) {
+      const id = idByKodeDb.get(r.kode_buku);
       if (id) {
-        adaGrp.push({ rows, id });
+        adaGrp.push({ rows: [r], id });
       } else {
-        let kode = rows[0].kode_buku;
+        let kode = r.kode_buku;
         let n = 1;
-        while (kodeDipakai.has(kode)) kode = `${rows[0].kode_buku}-${n++}`;
+        while (kodeDipakai.has(kode)) kode = `${r.kode_buku}-${n++}`;
         kodeDipakai.add(kode);
-        rows[0] = { ...rows[0], kode_buku: kode };
-        baruGrp.push({ rows });
+        baruGrp.push({ rows: [{ ...r, kode_buku: kode }] });
       }
     }
 
@@ -650,7 +620,7 @@ export const imporBukuMassal = createServerFn({ method: "POST" })
       skipped = 0,
       eksemplarDibuat = 0;
 
-    // 4) Bulk upsert buku BARU (konflik kode_buku), ambil id-nya kembali.
+    // Bulk upsert buku BARU (konflik kode_buku), ambil id-nya kembali.
     for (let i = 0; i < baruGrp.length; i += 300) {
       const slice = baruGrp.slice(i, i + 300);
       const { data: ins, error } = await db
@@ -658,9 +628,9 @@ export const imporBukuMassal = createServerFn({ method: "POST" })
         .upsert(slice.map((g) => buatPayload(g.rows)), { onConflict: "kode_buku" })
         .select("id, kode_buku");
       if (error) throw new Error(`Gagal menyimpan buku baru: ${error.message}`);
-      const idByKode = new Map<string, string>((ins ?? []).map((b: any) => [b.kode_buku, b.id]));
+      const insIdByKode = new Map<string, string>((ins ?? []).map((b: any) => [b.kode_buku, b.id]));
       for (const g of slice) {
-        const id = idByKode.get(g.rows[0].kode_buku);
+        const id = insIdByKode.get(g.rows[0].kode_buku);
         if (id) {
           g.id = id;
           inserted++;
@@ -668,17 +638,11 @@ export const imporBukuMassal = createServerFn({ method: "POST" })
       }
     }
 
-    // 5) Bulk update buku yang SUDAH ADA (hanya overwrite). Dedup per id;
-    //    kode_buku dipertahankan apa adanya (tidak ditimpa dari file).
+    // Bulk update buku yang SUDAH ADA (hanya overwrite), upsert by id (dedup).
     if (adaGrp.length && data.mode === "overwrite") {
       const byId = new Map<string, any>();
       for (const g of adaGrp) {
-        byId.set(g.id!, {
-          id: g.id!,
-          ...buatPayload(g.rows),
-          kode_buku: kodeById.get(g.id!) ?? g.rows[0].kode_buku,
-          deleted_at: null,
-        });
+        byId.set(g.id!, { id: g.id!, ...buatPayload(g.rows), deleted_at: null });
       }
       const payloads = [...byId.values()];
       for (let i = 0; i < payloads.length; i += 300) {
