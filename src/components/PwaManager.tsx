@@ -18,13 +18,43 @@ export function PwaManager() {
   useEffect(() => {
     if (typeof navigator === "undefined" || !("serviceWorker" in navigator)) return;
     const register = () => {
-      navigator.serviceWorker.register("/sw.js").catch(() => {
-        /* registrasi gagal — aplikasi tetap berjalan online */
-      });
+      navigator.serviceWorker
+        // updateViaCache: "none" mencegah service worker basi (penyebab umum
+        // error "Failed to fetch" setelah aplikasi diperbarui).
+        .register("/sw.js", { updateViaCache: "none" })
+        .then((reg) => {
+          void reg.update();
+          reg.addEventListener("updatefound", () => {
+            const sw = reg.installing;
+            if (!sw) return;
+            sw.addEventListener("statechange", () => {
+              if (sw.state === "installed" && navigator.serviceWorker.controller) {
+                sw.postMessage("SKIP_WAITING");
+              }
+            });
+          });
+        })
+        .catch(() => {
+          /* registrasi gagal — aplikasi tetap berjalan online */
+        });
     };
+
+    let reloading = false;
+    const onControllerChange = () => {
+      if (reloading) return;
+      reloading = true;
+      window.location.reload();
+    };
+    navigator.serviceWorker.addEventListener("controllerchange", onControllerChange);
+
     if (document.readyState === "complete") register();
     else window.addEventListener("load", register, { once: true });
+
+    return () => {
+      navigator.serviceWorker.removeEventListener("controllerchange", onControllerChange);
+    };
   }, []);
+
 
   useEffect(() => {
     const onPrompt = (e: Event) => {
