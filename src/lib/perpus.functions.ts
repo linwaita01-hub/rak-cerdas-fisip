@@ -540,21 +540,25 @@ export const imporBukuMassal = createServerFn({ method: "POST" })
         created = true;
       }
 
-      // Buat eksemplar hanya untuk buku baru
-      if (created && bukuId && r.jumlah_eksemplar && r.jumlah_eksemplar > 0) {
-        const rows = Array.from({ length: r.jumlah_eksemplar }, (_, i) => {
-          const kode = `${r.kode_buku}-${String(i + 1).padStart(4, "0")}`;
-          // Eksemplar pertama pakai barcode asli dari file bila ada; sisanya generate.
-          const barcode = i === 0 && r.barcode_value ? r.barcode_value : kode;
-          return {
-            buku_id: bukuId!,
-            kode_eksemplar: kode,
+      // Buat 1 eksemplar per baris, pakai kode barcot dari file.
+      // Jika barcode_value ada di file → pakai sebagai kode_eksemplar & barcode.
+      // Jika tidak ada → generate dari kode_buku.
+      if (bukuId && (created || data.mode === "overwrite")) {
+        const barcode = r.barcode_value || `${r.kode_buku}-0001`;
+        const { data: dupEks } = await supabaseAdmin
+          .from("eksemplar")
+          .select("id")
+          .eq("barcode_value", barcode)
+          .maybeSingle();
+        if (!dupEks) {
+          const { error: eErr } = await supabaseAdmin.from("eksemplar").insert({
+            buku_id: bukuId,
+            kode_eksemplar: barcode,
             barcode_value: barcode,
             status: "tersedia" as const,
-          };
-        });
-        const { error: eErr } = await supabaseAdmin.from("eksemplar").insert(rows);
-        if (!eErr) eksemplarDibuat += rows.length;
+          });
+          if (!eErr) eksemplarDibuat++;
+        }
       }
     }
 

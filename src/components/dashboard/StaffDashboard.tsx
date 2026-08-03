@@ -99,18 +99,22 @@ function TabTransaksi() {
   const bebaskan = useServerFn(bebaskanDenda);
   const sweep = useServerFn(jalankanSweepTerlambat);
 
-  // Realtime refresh
+  // Realtime refresh + notifikasi in-app
   useEffect(() => {
     const ch = supabase
       .channel("staff-transaksi")
-      .on("postgres_changes", { event: "*", schema: "public", table: "peminjaman" }, () => {
+      .on("postgres_changes", { event: "*", schema: "public", table: "peminjaman" }, (payload) => {
         qc.invalidateQueries({ queryKey: ["pinjaman-aktif"] });
+        if (payload.eventType === "INSERT") toast.info("Peminjaman baru tercatat.");
+        if (payload.eventType === "UPDATE" && payload.new?.status === "dikembalikan")
+          toast.info("Buku dikembalikan.");
       })
       .on("postgres_changes", { event: "*", schema: "public", table: "eksemplar" }, () => {
         qc.invalidateQueries({ queryKey: ["buku-list"] });
       })
-      .on("postgres_changes", { event: "*", schema: "public", table: "denda" }, () => {
+      .on("postgres_changes", { event: "*", schema: "public", table: "denda" }, (payload) => {
         qc.invalidateQueries({ queryKey: ["denda-list"] });
+        if (payload.eventType === "INSERT") toast.warning("Denda baru terdeteksi.");
       })
       .subscribe();
     return () => {
@@ -685,15 +689,30 @@ function TabInventaris() {
         {allRows.length === 0 && <p className="text-sm text-muted-foreground">Tidak ada buku.</p>}
       </div>
 
-      {/* Dialog edit buku */}
+      {/* Dialog edit / tambah buku */}
       <Dialog open={!!editBuku} onOpenChange={(o) => !o && setEditBuku(null)}>
         <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>{editBuku?.id ? "Ubah buku" : "Buku baru"}</DialogTitle>
-          </DialogHeader>
-          {editBuku && (
-            <BukuForm
-              initial={editBuku}
+          {editBuku?.id ? (
+            <>
+              <DialogHeader>
+                <DialogTitle>Ubah buku</DialogTitle>
+              </DialogHeader>
+              <BukuForm
+                initial={editBuku}
+                onSubmit={async (v) => {
+                  try {
+                    await simpan({ data: v });
+                    toast.success("Tersimpan.");
+                    setEditBuku(null);
+                    qc.invalidateQueries({ queryKey: ["buku-list"] });
+                  } catch (e) {
+                    toast.error(e instanceof Error ? e.message : "Gagal.");
+                  }
+                }}
+              />
+            </>
+          ) : editBuku ? (
+            <TambahBukuTabs
               onSubmit={async (v) => {
                 try {
                   await simpan({ data: v });
@@ -705,7 +724,7 @@ function TabInventaris() {
                 }
               }}
             />
-          )}
+          ) : null}
         </DialogContent>
       </Dialog>
 
@@ -805,6 +824,122 @@ const BUKU_FIELDS: FieldDef[] = [
   { key: "sampul_path", label: "Foto (URL sampul)", full: true },
 ];
 
+function TambahBukuTabs({ onSubmit }: { onSubmit: (v: any) => Promise<void> }) {
+  const [tab, setTab] = useState<"baru" | "dari-ada">("baru");
+  const [sumberBuku, setSumberBuku] = useState<any>(null);
+  const [cari, setCari] = useState("");
+  const [showSaran, setShowSaran] = useState(false);
+  const saranBuku = useQuery({
+    queryKey: ["saran-judul", cari],
+    enabled: cari.length >= 2,
+    queryFn: async () => {
+      const s = cari.trim().replace(/[%,]/g, "");
+      const { data } = await supabase
+        .from("buku")
+        .select("id, kode_buku, judul, pengarang, penerbit, tahun_terbit, isbn, kategori, lokasi_rak, deskripsi, sampul_path, meta")
+        .ilike("judul", `%${s}%`)
+        .limit(6);
+      return data ?? [];
+    },
+  });
+
+  function pilihBuku(b: any) {
+    const m = (b.meta ?? {}) as Record<string, string>;
+    setSumberBuku({
+      judul: b.judul ?? "",
+      pengarang: b.pengarang ?? "",
+      penerbit: b.penerbit ?? "",
+      tahun_terbit: b.tahun_terbit != null ? String(b.tahun_terbit) : "",
+      isbn: b.isbn ?? "",
+      kategori: b.kategori ?? "",
+      lokasi_rak: b.lokasi_rak ?? "",
+      deskripsi: b.deskripsi ?? "",
+      sampul_path: b.sampul_path ?? "",
+      meta: { ...m, kode_barcot: "" },
+    });
+    setShowSaran(false);
+  }
+
+  return (
+    <>
+      <DialogHeader>
+        <DialogTitle>Tambah buku</DialogTitle>
+      </DialogHeader>
+      <Tabs value={tab} onValueChange={(t) => { setTab(t as any); setSumberBuku(null); }}>
+        <TabsList className="w-full">
+          <TabsTrigger value="baru" className="flex-1">Buku Baru</TabsTrigger>
+          <TabsTrigger value="dari-ada" className="flex-1">Dari Buku yang Ada</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="baru" className="mt-3">
+          <BukuForm initial={{}} onSubmit={onSubmit} />
+        </TabsContent>
+
+        <TabsContent value="dari-ada" className="mt-3 space-y-3">
+          {!sumberBuku ? (
+            <div className="space-y-2">
+              <Label>Cari judul buku yang sudah ada</Label>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  value={cari}
+                  onChange={(e) => { setCari(e.target.value); setShowSaran(true); }}
+                  onFocus={() => cari.length >= 2 && setShowSaran(true)}
+                  onBlur={() => setTimeout(() => setShowSaran(false), 200)}
+                  placeholder="Ketik judul buku…"
+                  className="pl-9"
+                />
+              </div>
+              {showSaran && cari.length >= 2 && (
+                <div className="max-h-60 overflow-auto rounded-md border">
+                  {saranBuku.isFetching && (
+                    <div className="flex items-center gap-2 p-3 text-sm text-muted-foreground">
+                      <Loader2 className="h-3 w-3 animate-spin" /> Mencari…
+                    </div>
+                  )}
+                  {saranBuku.data?.map((b) => (
+                    <button
+                      key={b.id}
+                      type="button"
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={() => pilihBuku(b)}
+                      className="flex w-full flex-col gap-0.5 border-b p-3 text-left text-sm last:border-0 hover:bg-accent"
+                    >
+                      <span className="font-medium">{b.judul}</span>
+                      <span className="text-xs text-muted-foreground">
+                        {[b.pengarang, b.penerbit, b.tahun_terbit].filter(Boolean).join(" · ")}
+                      </span>
+                    </button>
+                  ))}
+                  {!saranBuku.isFetching && !saranBuku.data?.length && (
+                    <p className="p-3 text-sm text-muted-foreground">Tidak ada buku cocok.</p>
+                  )}
+                </div>
+              )}
+              <p className="text-xs text-muted-foreground">
+                Pilih buku dari daftar — semua data akan terisi otomatis. Tinggal ubah barcode untuk eksemplar baru.
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between rounded-md border bg-muted/40 p-2 text-sm">
+                <span>
+                  <BookOpen className="mr-1 inline h-4 w-4 text-primary" />
+                  Berdasarkan: <span className="font-medium">{sumberBuku.judul}</span>
+                </span>
+                <Button size="sm" variant="ghost" onClick={() => setSumberBuku(null)}>
+                  <X className="mr-1 h-3 w-3" /> Ganti
+                </Button>
+              </div>
+              <BukuForm initial={sumberBuku} onSubmit={onSubmit} />
+            </div>
+          )}
+        </TabsContent>
+      </Tabs>
+    </>
+  );
+}
+
 function BukuForm({ initial, onSubmit }: { initial: any; onSubmit: (v: any) => Promise<void> }) {
   const metaAwal = (initial.meta ?? {}) as Record<string, string>;
   const [v, setV] = useState<Record<string, string>>(() => {
@@ -821,7 +956,6 @@ function BukuForm({ initial, onSubmit }: { initial: any; onSubmit: (v: any) => P
       jumlah_eksemplar: "",
     };
     for (const k of META_FIELD_KEYS) base[k] = metaAwal[k] ?? "";
-    // Klasifikasi lama tersimpan di kolom kategori.
     if (!base.klasifikasi && initial.kategori) base.klasifikasi = initial.kategori;
     return base;
   });
@@ -838,14 +972,11 @@ function BukuForm({ initial, onSubmit }: { initial: any; onSubmit: (v: any) => P
       }
       await onSubmit({
         id: initial.id,
-        // kode_buku tidak dikirim: dibuat otomatis oleh server saat buku baru,
-        // dan dipertahankan apa adanya saat mengubah buku.
         judul: v.judul.trim(),
         pengarang: v.pengarang || null,
         penerbit: v.penerbit || null,
         tahun_terbit: v.tahun_terbit ? Number(v.tahun_terbit) : null,
         isbn: v.isbn || null,
-        // Klasifikasi juga disimpan ke kolom kategori agar filter/badge lama tetap jalan.
         kategori: v.klasifikasi || null,
         lokasi_rak: v.lokasi_rak || null,
         deskripsi: v.deskripsi || null,
@@ -853,7 +984,6 @@ function BukuForm({ initial, onSubmit }: { initial: any; onSubmit: (v: any) => P
         meta: Object.keys(meta).length ? meta : undefined,
         jumlah_eksemplar:
           !initial.id && v.jumlah_eksemplar ? Number(v.jumlah_eksemplar) : undefined,
-        // Eksemplar dibuat mengikuti kode barcot/eksemplar yang diinput.
         kode_eksemplar_awal: !initial.id && v.kode_barcot?.trim() ? v.kode_barcot.trim() : undefined,
       });
     } finally {

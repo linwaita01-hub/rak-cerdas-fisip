@@ -1,10 +1,10 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 
-export type Role = "super_admin" | "admin" | "mahasiswa";
+export type Role = "admin" | "mahasiswa";
 
-export const ROLE_PRIORITY: Role[] = ["super_admin", "admin", "mahasiswa"];
-export const STAFF_ROLES: Role[] = ["super_admin", "admin"];
+export const ROLE_PRIORITY: Role[] = ["admin", "mahasiswa"];
+export const STAFF_ROLES: Role[] = ["admin"];
 
 export type Profile = {
   id: string;

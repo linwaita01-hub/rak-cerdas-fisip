@@ -6,7 +6,6 @@ import { Button } from "@/components/ui/button";
 import { Loader2, LogOut } from "lucide-react";
 import { toast } from "sonner";
 import { StaffDashboard } from "@/components/dashboard/StaffDashboard";
-import { PushToggle } from "@/components/PushToggle";
 
 export const Route = createFileRoute("/_authenticated/app")({
   component: AppHome,
@@ -42,7 +41,6 @@ function AppHome() {
             <p className="hidden text-sm font-medium sm:block">
               {profile?.nama ?? profile?.email}
             </p>
-            <PushToggle />
             <Button variant="ghost" size="sm" onClick={onLogout}>
               <LogOut className="mr-2 h-4 w-4" /> Keluar
             </Button>
