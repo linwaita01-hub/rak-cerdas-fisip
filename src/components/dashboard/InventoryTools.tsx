@@ -166,6 +166,7 @@ export function ImportBukuButton() {
     const total = tasks.length;
     let selesai = 0;
     let gagal = 0;
+    let pesanGagal = "";
 
     const unggahSatu = async (t: { k: string; blob: Blob }) => {
       const ext = t.blob.type.includes("png") ? "png" : t.blob.type.includes("gif") ? "gif" : "jpg";
@@ -180,6 +181,7 @@ export function ImportBukuButton() {
           paths.set(t.k, path);
           return;
         }
+        if (!pesanGagal) pesanGagal = error.message; // simpan alasan asli pertama
         await sleep(400 * (attempt + 1));
       }
       gagal++;
@@ -200,8 +202,14 @@ export function ImportBukuButton() {
     // Hanya 3 unggahan berjalan bersamaan.
     await Promise.all(Array.from({ length: 3 }, () => worker()));
     if (gagal > 0) {
+      const rls = /policy|row-level|permission|denied/i.test(pesanGagal);
+      const hint = rls
+        ? " Sebab: izin tulis storage belum diatur (jalankan SQL policy bucket 'sampul')."
+        : pesanGagal
+          ? ` Sebab: ${pesanGagal}`
+          : "";
       toast.warning(
-        `${gagal}/${total} foto gagal diunggah. Data buku tetap tersimpan; foto bisa dilengkapi manual nanti.`,
+        `${gagal}/${total} foto gagal diunggah. Data buku tetap tersimpan.${hint}`,
       );
     }
     return paths;
