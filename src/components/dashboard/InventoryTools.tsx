@@ -62,8 +62,8 @@ function barisBaru(): EditRow {
 const imporColumns: Column<EditRow>[] = [
   {
     ...keyColumn<EditRow, "kode_buku">("kode_buku", textColumn),
-    title: "Kode buku",
-    minWidth: 130,
+    title: "Kode buku / Barcode",
+    minWidth: 150,
   },
   { ...keyColumn<EditRow, "judul">("judul", textColumn), title: "Judul", minWidth: 220, grow: 2 },
   {
@@ -83,11 +83,6 @@ const imporColumns: Column<EditRow>[] = [
     ...keyColumn<EditRow, "lokasi_rak">("lokasi_rak", textColumn),
     title: "Lokasi rak",
     minWidth: 120,
-  },
-  {
-    ...keyColumn<EditRow, "barcode_value">("barcode_value", textColumn),
-    title: "Kode Barcot",
-    minWidth: 130,
   },
 ];
 
@@ -245,7 +240,8 @@ export function ImportBukuButton() {
         .filter((r) => r.kode_buku && r.judul)
         .map((r) => ({
           kode_buku: r.kode_buku as string,
-          barcode_value: r.barcode_value,
+          // Barcode eksemplar = kode_buku (tiap buku 1 unit), selalu sinkron.
+          barcode_value: r.barcode_value || r.kode_buku,
           judul: r.judul as string,
           pengarang: r.pengarang,
           penerbit: r.penerbit,

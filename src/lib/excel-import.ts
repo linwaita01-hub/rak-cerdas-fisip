@@ -235,14 +235,19 @@ export async function parseExcelFile(file: File): Promise<{ sheets: SheetPreview
       const nonEmpty = r.filter((c) => c != null && String(c).trim() !== "").length;
       if (nonEmpty < 2) continue;
       const judul = toStr(r[columnMap.judul ?? -1]);
-      const kode = toStrCode(r[columnMap.kode_buku ?? -1]);
+      // No. Inventaris (kolom "kode_buku" di file) & barcode eksemplar (Kode Barcot).
+      const noInventaris = toStrCode(r[columnMap.kode_buku ?? -1]);
+      const barcode = toStrCode(r[columnMap.barcode_value ?? -1]);
       if (!judul) continue;
 
+      // kode_buku memakai BARCODE eksemplar (tiap buku = 1 unit). Bila barcode
+      // kosong, jatuh ke No. Inventaris, lalu kode yang di-generate.
+      const kode = barcode ?? noInventaris ?? `${name.slice(0, 6).replace(/\s+/g, "")}-${i + 1}`;
       const row: ImporRow = {
         _sheet: name,
         _row: i + 1,
-        kode_buku: kode ?? `${name.slice(0, 6).replace(/\s+/g, "")}-${i + 1}`,
-        barcode_value: toStrCode(r[columnMap.barcode_value ?? -1]),
+        kode_buku: kode,
+        barcode_value: barcode ?? kode,
         judul,
         pengarang: toStr(r[columnMap.pengarang ?? -1]),
         penerbit: toStr(r[columnMap.penerbit ?? -1]),
@@ -265,6 +270,10 @@ export async function parseExcelFile(file: File): Promise<{ sheets: SheetPreview
         if (key === "catatan") continue;
         if (!(key in meta)) meta[key] = val;
       }
+      // No. Inventaris & Kode Barcot disimpan ke meta agar form Ubah buku
+      // (yang membaca field ini dari meta) ikut terisi setelah impor.
+      if (noInventaris && !meta.kode_inventaris) meta.kode_inventaris = noInventaris;
+      if (kode && !meta.kode_barcot) meta.kode_barcot = kode;
       if (Object.keys(meta).length) row.meta = meta;
 
       if (!row.judul || !row.kode_buku) {
