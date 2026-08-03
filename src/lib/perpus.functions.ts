@@ -312,10 +312,47 @@ export const hapusBuku = createServerFn({ method: "POST" })
   .inputValidator((d) => z.object({ id: z.string().uuid() }).parse(d))
   .handler(async ({ data, context }) => {
     await ensureStaff(context);
-    const { error } = await context.supabase
-      .from("buku")
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    // Soft delete + pastikan berhasil (bypass RLS pakai admin).
+    const { data: updated, error } = await (supabaseAdmin.from("buku") as any)
       .update({ deleted_at: new Date().toISOString() })
-      .eq("id", data.id);
+      .eq("id", data.id)
+      .is("deleted_at", null)
+      .select("id")
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    if (!updated) throw new Error("Buku tidak ditemukan atau sudah dihapus.");
+    return { ok: true };
+  });
+
+// Tambah 1 eksemplar baru ke buku yang sudah ada dengan barcode manual.
+// Dipakai oleh tab "Dari Buku yang Ada" saat menambah salinan buku.
+export const tambahEksemplarSatu = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) =>
+    z
+      .object({
+        buku_id: z.string().uuid(),
+        barcode: z.string().trim().min(1),
+      })
+      .parse(d),
+  )
+  .handler(async ({ data, context }) => {
+    await ensureStaff(context);
+    const barcode = data.barcode.trim();
+    // Cek duplikat barcode
+    const { data: dup } = await context.supabase
+      .from("eksemplar")
+      .select("id")
+      .eq("barcode_value", barcode)
+      .maybeSingle();
+    if (dup) throw new Error(`Barcode "${barcode}" sudah dipakai eksemplar lain.`);
+    const { error } = await context.supabase.from("eksemplar").insert({
+      buku_id: data.buku_id,
+      kode_eksemplar: barcode,
+      barcode_value: barcode,
+      status: "tersedia" as const,
+    });
     if (error) throw new Error(error.message);
     return { ok: true };
   });
@@ -457,6 +494,22 @@ export const kembalikanVersiBuku = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
+// Pastikan bucket 'sampul' ada sebelum mengunggah foto. Service role boleh
+// membuat bucket, jadi tak perlu langkah manual. Error "sudah ada" diabaikan.
+// Catatan: policy tulis (RLS) tetap berasal dari migrasi katalog; ini hanya
+// menjamin bucket-nya ada.
+export const pastikanBucketSampul = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    await ensureStaff(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { error } = await supabaseAdmin.storage.createBucket("sampul", { public: true });
+    if (error && !/exist|already/i.test(error.message)) {
+      return { ok: false, note: error.message };
+    }
+    return { ok: true };
+  });
+
 // ============= STAFF: IMPOR MASSAL =============
 const imporRow = z.object({
   kode_buku: z.string().min(1),
@@ -469,7 +522,6 @@ const imporRow = z.object({
   kategori: z.string().nullish(),
   lokasi_rak: z.string().nullish(),
   deskripsi: z.string().nullish(),
-  jumlah_eksemplar: z.number().int().min(0).max(200).nullish(),
   meta: z.record(z.string(), z.string()).nullish(),
   sampul_path: z.string().nullish(),
 });
@@ -487,79 +539,189 @@ export const imporBukuMassal = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     await ensureStaff(context);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const db = supabaseAdmin as any;
 
-    // Ambil daftar kode_buku yg sudah ada
-    const kodes = data.rows.map((r) => r.kode_buku);
-    const { data: existing } = await supabaseAdmin
-      .from("buku")
-      .select("id, kode_buku")
-      .in("kode_buku", kodes);
-    const existingMap = new Map((existing ?? []).map((b) => [b.kode_buku, b.id]));
+    // Semua operasi DIBUAT SET-BASED (bulk) — hanya beberapa query per batch,
+    // apa pun jumlah barisnya. Ini menghindari batas subrequest Cloudflare
+    // Workers yang membuat impor besar (mis. 1500+ baris) gagal di tengah.
+
+    const norm = (s: string | null | undefined) =>
+      (s || "").toLowerCase().trim().replace(/\s+/g, " ");
+    const rowKey = (r: (typeof data.rows)[number]) =>
+      r.isbn && r.isbn.trim() ? `isbn:${norm(r.isbn)}` : `jp:${norm(r.judul)}|${norm(r.pengarang)}`;
+
+    // Query .in() dipecah agar URL/pernyataan tidak kepanjangan.
+    const chunkIn = async (
+      table: string,
+      col: string,
+      select: string,
+      vals: string[],
+    ): Promise<any[]> => {
+      const out: any[] = [];
+      const uniq = [...new Set(vals)].filter(Boolean);
+      for (let i = 0; i < uniq.length; i += 100) {
+        const slice = uniq.slice(i, i + 100);
+        if (!slice.length) continue;
+        const { data: rows, error } = await db.from(table).select(select).in(col, slice);
+        if (error) throw new Error(`Gagal membaca ${table}: ${error.message}`);
+        if (rows) out.push(...rows);
+      }
+      return out;
+    };
+
+    // 1) Kelompokkan baris → satu buku per grup, satu eksemplar per baris.
+    const groups = new Map<string, typeof data.rows>();
+    for (const r of data.rows) {
+      const k = rowKey(r);
+      const arr = groups.get(k);
+      if (arr) arr.push(r);
+      else groups.set(k, [r]);
+    }
+
+    // 2) Ambil buku yang sudah ada (by isbn / kode_buku / judul) — set-based.
+    const existingByKey = new Map<string, string>(); // rowKey → buku_id
+    const existingByKode = new Map<string, string>(); // kode_buku → buku_id
+    const kodeById = new Map<string, string>(); // buku_id → kode_buku (yang di DB)
+    const found = [
+      ...(await chunkIn(
+        "buku",
+        "isbn",
+        "id, kode_buku, isbn, judul, pengarang",
+        data.rows.map((r) => r.isbn).filter(Boolean) as string[],
+      )),
+      ...(await chunkIn(
+        "buku",
+        "kode_buku",
+        "id, kode_buku, isbn, judul, pengarang",
+        data.rows.map((r) => r.kode_buku),
+      )),
+      ...(await chunkIn(
+        "buku",
+        "judul",
+        "id, kode_buku, isbn, judul, pengarang",
+        data.rows.map((r) => r.judul),
+      )),
+    ];
+    for (const b of found) {
+      if (b.isbn) existingByKey.set(`isbn:${norm(b.isbn)}`, b.id);
+      existingByKey.set(`jp:${norm(b.judul)}|${norm(b.pengarang)}`, b.id);
+      existingByKode.set(b.kode_buku, b.id);
+      kodeById.set(b.id, b.kode_buku);
+    }
+
+    const buatPayload = (rows: typeof data.rows) => {
+      const first = rows[0];
+      return {
+        kode_buku: first.kode_buku,
+        judul: first.judul,
+        pengarang: first.pengarang ?? null,
+        penerbit: first.penerbit ?? null,
+        tahun_terbit: first.tahun_terbit ?? null,
+        isbn: first.isbn ?? null,
+        kategori: first.kategori ?? null,
+        lokasi_rak: first.lokasi_rak ?? null,
+        deskripsi: first.deskripsi ?? null,
+        sampul_path: first.sampul_path ?? null,
+        meta: first.meta ?? {},
+      };
+    };
+
+    // 3) Pisahkan grup: baru vs sudah ada. Dedup kode_buku antar-grup di batch.
+    type Grp = { rows: typeof data.rows; id?: string };
+    const baruGrp: Grp[] = [];
+    const adaGrp: Grp[] = [];
+    const kodeDipakai = new Set(existingByKode.keys());
+    for (const [key, rows] of groups.entries()) {
+      const id = existingByKey.get(key) ?? existingByKode.get(rows[0].kode_buku);
+      if (id) {
+        adaGrp.push({ rows, id });
+      } else {
+        let kode = rows[0].kode_buku;
+        let n = 1;
+        while (kodeDipakai.has(kode)) kode = `${rows[0].kode_buku}-${n++}`;
+        kodeDipakai.add(kode);
+        rows[0] = { ...rows[0], kode_buku: kode };
+        baruGrp.push({ rows });
+      }
+    }
 
     let inserted = 0,
       updated = 0,
       skipped = 0,
       eksemplarDibuat = 0;
 
-    for (const r of data.rows) {
-      const payload = {
-        kode_buku: r.kode_buku,
-        judul: r.judul,
-        pengarang: r.pengarang ?? null,
-        penerbit: r.penerbit ?? null,
-        tahun_terbit: r.tahun_terbit ?? null,
-        isbn: r.isbn ?? null,
-        kategori: r.kategori ?? null,
-        lokasi_rak: r.lokasi_rak ?? null,
-        deskripsi: r.deskripsi ?? null,
-        sampul_path: r.sampul_path ?? null,
-        meta: r.meta ?? {},
-      };
-      const existingId = existingMap.get(r.kode_buku);
-      let bukuId: string | undefined;
-      let created = false;
-      if (existingId) {
-        if (data.mode === "skip") {
-          skipped++;
-          continue;
+    // 4) Bulk upsert buku BARU (konflik kode_buku), ambil id-nya kembali.
+    for (let i = 0; i < baruGrp.length; i += 300) {
+      const slice = baruGrp.slice(i, i + 300);
+      const { data: ins, error } = await db
+        .from("buku")
+        .upsert(slice.map((g) => buatPayload(g.rows)), { onConflict: "kode_buku" })
+        .select("id, kode_buku");
+      if (error) throw new Error(`Gagal menyimpan buku baru: ${error.message}`);
+      const idByKode = new Map<string, string>((ins ?? []).map((b: any) => [b.kode_buku, b.id]));
+      for (const g of slice) {
+        const id = idByKode.get(g.rows[0].kode_buku);
+        if (id) {
+          g.id = id;
+          inserted++;
         }
-        const { error } = await (supabaseAdmin.from("buku") as any)
-          .update({ ...payload, deleted_at: null })
-          .eq("id", existingId);
-        if (error) throw new Error(`Gagal update ${r.kode_buku}: ${error.message}`);
-        bukuId = existingId;
-        updated++;
-      } else {
-        const { data: ins, error } = await (supabaseAdmin.from("buku") as any)
-          .insert(payload)
-          .select("id")
-          .single();
-        if (error) throw new Error(`Gagal insert ${r.kode_buku}: ${error.message}`);
-        bukuId = ins.id;
-        inserted++;
-        created = true;
       }
+    }
 
-      // Buat 1 eksemplar per baris, pakai kode barcot dari file.
-      // Jika barcode_value ada di file → pakai sebagai kode_eksemplar & barcode.
-      // Jika tidak ada → generate dari kode_buku.
-      if (bukuId && (created || data.mode === "overwrite")) {
-        const barcode = r.barcode_value || `${r.kode_buku}-0001`;
-        const { data: dupEks } = await supabaseAdmin
-          .from("eksemplar")
-          .select("id")
-          .eq("barcode_value", barcode)
-          .maybeSingle();
-        if (!dupEks) {
-          const { error: eErr } = await supabaseAdmin.from("eksemplar").insert({
-            buku_id: bukuId,
-            kode_eksemplar: barcode,
-            barcode_value: barcode,
-            status: "tersedia" as const,
-          });
-          if (!eErr) eksemplarDibuat++;
-        }
+    // 5) Bulk update buku yang SUDAH ADA (hanya overwrite). Dedup per id;
+    //    kode_buku dipertahankan apa adanya (tidak ditimpa dari file).
+    if (adaGrp.length && data.mode === "overwrite") {
+      const byId = new Map<string, any>();
+      for (const g of adaGrp) {
+        byId.set(g.id!, {
+          id: g.id!,
+          ...buatPayload(g.rows),
+          kode_buku: kodeById.get(g.id!) ?? g.rows[0].kode_buku,
+          deleted_at: null,
+        });
       }
+      const payloads = [...byId.values()];
+      for (let i = 0; i < payloads.length; i += 300) {
+        const slice = payloads.slice(i, i + 300);
+        const { error } = await db.from("buku").upsert(slice, { onConflict: "id" });
+        if (error) throw new Error(`Gagal memperbarui buku: ${error.message}`);
+      }
+      updated = byId.size;
+    } else if (adaGrp.length) {
+      skipped = new Set(adaGrp.map((g) => g.id)).size;
+    }
+
+    // 6) Susun eksemplar (1 per baris), buang barcode yang sudah ada di DB.
+    const semuaGrp = [...baruGrp, ...adaGrp].filter((g) => g.id);
+    const barcodeSet = new Set<string>();
+    const eksCandidates: { buku_id: string; barcode: string }[] = [];
+    for (const g of semuaGrp) {
+      g.rows.forEach((r, i) => {
+        const barcode =
+          (r.barcode_value && r.barcode_value.trim()) ||
+          `${g.rows[0].kode_buku}-${String(i + 1).padStart(4, "0")}`;
+        if (barcodeSet.has(barcode)) return; // dedup di dalam batch
+        barcodeSet.add(barcode);
+        eksCandidates.push({ buku_id: g.id!, barcode });
+      });
+    }
+    const adaBarcode = new Set<string>(
+      (await chunkIn("eksemplar", "barcode_value", "barcode_value", [...barcodeSet])).map(
+        (e) => e.barcode_value,
+      ),
+    );
+    const eksRows = eksCandidates
+      .filter((e) => !adaBarcode.has(e.barcode))
+      .map((e) => ({
+        buku_id: e.buku_id,
+        kode_eksemplar: e.barcode,
+        barcode_value: e.barcode,
+        status: "tersedia" as const,
+      }));
+    for (let i = 0; i < eksRows.length; i += 300) {
+      const slice = eksRows.slice(i, i + 300);
+      const { error } = await db.from("eksemplar").insert(slice);
+      if (!error) eksemplarDibuat += slice.length;
     }
 
     return { inserted, updated, skipped, eksemplarDibuat };
@@ -567,21 +729,22 @@ export const imporBukuMassal = createServerFn({ method: "POST" })
 
 // ── Tambah mahasiswa cepat dari dasbor petugas ──────────────────────────────
 // Membuat akun auth + profil mahasiswa (nama, NIM, prodi). Hanya staf.
+const mahasiswaFields = z.object({
+  nama: z.string().trim().min(3),
+  nim: z
+    .string()
+    .trim()
+    .regex(/^\d{6,15}$/),
+  prodi: z.string().trim().min(2),
+  tempat_lahir: z.string().trim().optional().nullable(),
+  tanggal_lahir: z.string().trim().optional().nullable(),
+  alamat: z.string().trim().optional().nullable(),
+  no_telp: z.string().trim().optional().nullable(),
+});
+
 export const tambahMahasiswa = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d: unknown) =>
-    z
-      .object({
-        nama: z.string().trim().min(3),
-        nim: z
-          .string()
-          .trim()
-          .regex(/^\d{6,15}$/),
-        prodi: z.string().trim().min(2),
-        email: z.string().trim().email().optional().or(z.literal("")),
-      })
-      .parse(d),
-  )
+  .inputValidator((d: unknown) => mahasiswaFields.parse(d))
   .handler(async ({ data, context }) => {
     const { data: staf, error: sErr } = await context.supabase.rpc("is_staff", {
       _user_id: context.userId,
@@ -598,24 +761,28 @@ export const tambahMahasiswa = createServerFn({ method: "POST" })
       .maybeSingle();
     if (dup) throw new Error(`NIM ${data.nim} sudah terdaftar.`);
 
-    const email = data.email?.trim() || `${data.nim}@mhs.fisip.ulm.ac.id`;
-    const sandi = `Fisip-${data.nim}-${Math.random().toString(36).slice(2, 8)}`;
-
+    // Mahasiswa sekarang data saja — tetap butuh auth user karena FK profiles.id → auth.users.id.
+    // Sandi acak tidak pernah ditampilkan; mahasiswa tidak login.
+    const email = `${data.nim}@mhs.fisip.ulm.ac.id`;
+    const sandi = `Fisip-${data.nim}-${Math.random().toString(36).slice(2, 10)}`;
     const { data: created, error: cErr } = await supabaseAdmin.auth.admin.createUser({
       email,
       password: sandi,
       email_confirm: true,
       user_metadata: { nama: data.nama },
     });
-    if (cErr || !created.user) throw new Error(cErr?.message ?? "Gagal membuat akun.");
+    if (cErr || !created.user) throw new Error(cErr?.message ?? "Gagal membuat data mahasiswa.");
 
-    const { error: pErr } = await supabaseAdmin
-      .from("profiles")
+    const { error: pErr } = await (supabaseAdmin.from("profiles") as any)
       .update({
         nama: data.nama,
         nim: data.nim,
         prodi: data.prodi,
         email,
+        tempat_lahir: data.tempat_lahir || null,
+        tanggal_lahir: data.tanggal_lahir || null,
+        alamat: data.alamat || null,
+        no_telp: data.no_telp || null,
         is_profile_completed: true,
       })
       .eq("id", created.user.id);
@@ -624,5 +791,58 @@ export const tambahMahasiswa = createServerFn({ method: "POST" })
       throw new Error(pErr.message);
     }
 
-    return { id: created.user.id, nama: data.nama, nim: data.nim, prodi: data.prodi, email, sandi };
+    return { id: created.user.id, nama: data.nama, nim: data.nim, prodi: data.prodi, email };
+  });
+
+export const ubahMahasiswa = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => mahasiswaFields.extend({ id: z.string().uuid() }).parse(d))
+  .handler(async ({ data, context }) => {
+    await ensureStaff(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    // Cek NIM unik (kecuali diri sendiri)
+    const { data: dup } = await supabaseAdmin
+      .from("profiles")
+      .select("id")
+      .eq("nim", data.nim)
+      .neq("id", data.id)
+      .maybeSingle();
+    if (dup) throw new Error(`NIM ${data.nim} sudah dipakai mahasiswa lain.`);
+
+    const { error } = await (supabaseAdmin.from("profiles") as any)
+      .update({
+        nama: data.nama,
+        nim: data.nim,
+        prodi: data.prodi,
+        tempat_lahir: data.tempat_lahir || null,
+        tanggal_lahir: data.tanggal_lahir || null,
+        alamat: data.alamat || null,
+        no_telp: data.no_telp || null,
+      })
+      .eq("id", data.id);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+export const hapusMahasiswa = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => z.object({ id: z.string().uuid() }).parse(d))
+  .handler(async ({ data, context }) => {
+    await ensureStaff(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    // Cek apakah mahasiswa sedang meminjam
+    const { data: pinjam } = await supabaseAdmin
+      .from("peminjaman")
+      .select("id")
+      .eq("user_id", data.id)
+      .in("status", ["dipinjam", "menunggu", "terlambat"])
+      .limit(1);
+    if (pinjam && pinjam.length) {
+      throw new Error("Mahasiswa masih memiliki pinjaman aktif — kembalikan dulu.");
+    }
+    // Delete auth user → CASCADE delete profile
+    const { error } = await supabaseAdmin.auth.admin.deleteUser(data.id);
+    if (error) throw new Error(error.message);
+    return { ok: true };
   });

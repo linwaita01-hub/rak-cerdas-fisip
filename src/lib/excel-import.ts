@@ -11,7 +11,6 @@ export type ImporRow = {
   kategori?: string | null;
   lokasi_rak?: string | null;
   deskripsi?: string | null;
-  jumlah_eksemplar?: number | null;
   meta?: Record<string, string>;
   _sheet?: string;
   _row?: number;
@@ -47,27 +46,12 @@ const MAP: Record<string, string[]> = {
   kategori: ["jeniskoleksi", "jenis", "kategori", "subjek", "klasifikasi", "klass"],
   lokasi_rak: ["nopanggil", "lokasi", "kodelokasi", "rak"],
   deskripsi: ["deskripsi", "deskripsifisik", "keterangan"],
-  // "eksemplar" SENGAJA tidak dipakai (kolom "Kode EKSEMPLAR" bukan jumlah).
-  // Kolom "JDL" (jumlah judul) dilewati; yang dipakai adalah "EKS" (eksemplar).
-  jumlah_eksemplar: [
-    "jumlaheksemplar",
-    "jumlahbuku",
-    "jlhbuku",
-    "jlheks",
-    "jumlaheks",
-    "eks",
-    "jumlah",
-    "jml",
-    "volume",
-    "satuan",
-  ],
+  // Kolom "Jumlah Eksemplar" sudah tidak dipakai — jumlah = jumlah baris per grup.
 };
 
 const ALL_HEADER_TOKENS = new Set(Object.values(MAP).flat());
 
-function matchField(field: string, n: string, keys: string[]): boolean {
-  // Kolom "JDL" = jumlah judul, bukan jumlah eksemplar → jangan dipetakan.
-  if (field === "jumlah_eksemplar" && n.includes("jdl")) return false;
+function matchField(_field: string, n: string, keys: string[]): boolean {
   return keys.some((k) => n === k || n.startsWith(k) || n.endsWith(k));
 }
 
@@ -219,9 +203,13 @@ export async function parseExcelFile(file: File): Promise<{ sheets: SheetPreview
   const sheets: SheetPreview[] = [];
   for (const name of namaCocok) {
     const ws = wb.Sheets[name];
+    // PENTING: blankrows harus `true` agar index array === nomor baris Excel
+    // asli. Foto tertanam di-anchor ke baris Excel (lihat excel-images.ts); bila
+    // baris kosong di-drop, index bergeser dan foto menempel ke buku yang salah.
+    // Baris kosong tetap diabaikan di loop data (cek `nonEmpty < 2`).
     const rows: unknown[][] = XLSX.utils.sheet_to_json(ws, {
       header: 1,
-      blankrows: false,
+      blankrows: true,
       defval: null,
     }) as unknown[][];
     if (!rows.length) continue;
@@ -250,7 +238,6 @@ export async function parseExcelFile(file: File): Promise<{ sheets: SheetPreview
       const kode = toStrCode(r[columnMap.kode_buku ?? -1]);
       if (!judul) continue;
 
-      const jml = toInt(r[columnMap.jumlah_eksemplar ?? -1]);
       const row: ImporRow = {
         _sheet: name,
         _row: i + 1,
@@ -264,8 +251,6 @@ export async function parseExcelFile(file: File): Promise<{ sheets: SheetPreview
         kategori: toStr(r[columnMap.kategori ?? -1]),
         lokasi_rak: toStr(r[columnMap.lokasi_rak ?? -1]),
         deskripsi: toStr(r[columnMap.deskripsi ?? -1]),
-        // Batasi ke rentang wajar; kolom yang salah tak akan meledakkan eksemplar.
-        jumlah_eksemplar: jml != null && jml >= 0 && jml <= 200 ? jml : 1,
       };
       // Tangkap SEMUA kolom tak-terpetakan → meta (tanpa mengurangi informasi),
       // termasuk kolom yang tidak punya judul header tapi tetap berisi teks.
@@ -313,11 +298,6 @@ export function eksporBukuKeExcel(rows: unknown[], filename = "buku.xlsx") {
     kategori: b.kategori ?? "",
     lokasi_rak: b.lokasi_rak ?? "",
     deskripsi: b.deskripsi ?? "",
-    jumlah_eksemplar: Array.isArray(b.eksemplar)
-      ? b.eksemplar.length
-      : typeof b.jumlah_eksemplar === "number"
-        ? b.jumlah_eksemplar
-        : 0,
   }));
   const ws = XLSX.utils.json_to_sheet(data);
   const wb = XLSX.utils.book_new();

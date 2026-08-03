@@ -38,7 +38,10 @@ import {
   ScanLine,
   Send,
   X,
+  Calendar as CalendarIcon,
 } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar as CalendarComp } from "@/components/ui/calendar";
 import { useGlobalScan } from "@/hooks/useGlobalScan";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -60,10 +63,13 @@ import {
   simpanBuku,
   hapusBuku,
   tambahEksemplar,
+  tambahEksemplarSatu,
   hapusEksemplar,
   ubahStatusEksemplar,
   simpanPengaturan,
   jalankanSweepTerlambat,
+  hapusMahasiswa,
+  ubahMahasiswa,
 } from "@/lib/perpus.functions";
 
 export function StaffDashboard() {
@@ -361,7 +367,8 @@ function PinjamMejaCard() {
     nama: string | null;
     nim: string | null;
   } | null>(null);
-  const [durasi, setDurasi] = useState(7);
+  const [durasiText, setDurasiText] = useState("7");
+  const durasi = Math.max(1, Math.min(180, Number(durasiText) || 7));
   const [busy, setBusy] = useState(false);
 
   async function onScan(code: string) {
@@ -506,11 +513,11 @@ function PinjamMejaCard() {
           <div className="w-28 space-y-1">
             <Label className="text-xs">Durasi (hari)</Label>
             <Input
-              type="number"
-              min={1}
-              max={60}
-              value={durasi}
-              onChange={(e) => setDurasi(Number(e.target.value) || 7)}
+              inputMode="numeric"
+              value={durasiText}
+              onChange={(e) => setDurasiText(e.target.value.replace(/\D/g, ""))}
+              onBlur={() => setDurasiText(String(durasi))}
+              placeholder="7"
             />
           </div>
           <Button className="flex-1" disabled={busy || !barcode || !terpilih} onClick={kirim}>
@@ -602,15 +609,20 @@ function TabInventaris() {
               onClick={async () => {
                 if (!confirm(`Hapus ${picked.size} buku yang dipilih?`)) return;
                 let ok = 0;
+                const gagal: string[] = [];
                 for (const id of picked) {
                   try {
                     await hapus({ data: { id } });
                     ok++;
-                  } catch {
-                    /* skip */
+                  } catch (e) {
+                    gagal.push(e instanceof Error ? e.message : String(e));
                   }
                 }
-                toast.success(`${ok} buku dihapus.`);
+                if (ok) toast.success(`${ok} buku dihapus.`);
+                if (gagal.length)
+                  toast.error(
+                    `${gagal.length} gagal dihapus. ${gagal[0].slice(0, 80)}`,
+                  );
                 setPicked(new Set());
                 qc.invalidateQueries({ queryKey: ["buku-list"] });
               }}
@@ -712,18 +724,7 @@ function TabInventaris() {
               />
             </>
           ) : editBuku ? (
-            <TambahBukuTabs
-              onSubmit={async (v) => {
-                try {
-                  await simpan({ data: v });
-                  toast.success("Tersimpan.");
-                  setEditBuku(null);
-                  qc.invalidateQueries({ queryKey: ["buku-list"] });
-                } catch (e) {
-                  toast.error(e instanceof Error ? e.message : "Gagal.");
-                }
-              }}
-            />
+            <TambahBukuTabs onSelesai={() => setEditBuku(null)} />
           ) : null}
         </DialogContent>
       </Dialog>
@@ -824,119 +825,174 @@ const BUKU_FIELDS: FieldDef[] = [
   { key: "sampul_path", label: "Foto (URL sampul)", full: true },
 ];
 
-function TambahBukuTabs({ onSubmit }: { onSubmit: (v: any) => Promise<void> }) {
+function TambahBukuTabs({ onSelesai }: { onSelesai: () => void }) {
   const [tab, setTab] = useState<"baru" | "dari-ada">("baru");
-  const [sumberBuku, setSumberBuku] = useState<any>(null);
-  const [cari, setCari] = useState("");
-  const [showSaran, setShowSaran] = useState(false);
-  const saranBuku = useQuery({
-    queryKey: ["saran-judul", cari],
-    enabled: cari.length >= 2,
-    queryFn: async () => {
-      const s = cari.trim().replace(/[%,]/g, "");
-      const { data } = await supabase
-        .from("buku")
-        .select("id, kode_buku, judul, pengarang, penerbit, tahun_terbit, isbn, kategori, lokasi_rak, deskripsi, sampul_path, meta")
-        .ilike("judul", `%${s}%`)
-        .limit(6);
-      return data ?? [];
-    },
-  });
-
-  function pilihBuku(b: any) {
-    const m = (b.meta ?? {}) as Record<string, string>;
-    setSumberBuku({
-      judul: b.judul ?? "",
-      pengarang: b.pengarang ?? "",
-      penerbit: b.penerbit ?? "",
-      tahun_terbit: b.tahun_terbit != null ? String(b.tahun_terbit) : "",
-      isbn: b.isbn ?? "",
-      kategori: b.kategori ?? "",
-      lokasi_rak: b.lokasi_rak ?? "",
-      deskripsi: b.deskripsi ?? "",
-      sampul_path: b.sampul_path ?? "",
-      meta: { ...m, kode_barcot: "" },
-    });
-    setShowSaran(false);
-  }
-
+  const qc = useQueryClient();
+  const simpan = useServerFn(simpanBuku);
   return (
     <>
       <DialogHeader>
         <DialogTitle>Tambah buku</DialogTitle>
       </DialogHeader>
-      <Tabs value={tab} onValueChange={(t) => { setTab(t as any); setSumberBuku(null); }}>
+      <Tabs value={tab} onValueChange={(t) => setTab(t as any)}>
         <TabsList className="w-full">
           <TabsTrigger value="baru" className="flex-1">Buku Baru</TabsTrigger>
           <TabsTrigger value="dari-ada" className="flex-1">Dari Buku yang Ada</TabsTrigger>
         </TabsList>
 
         <TabsContent value="baru" className="mt-3">
-          <BukuForm initial={{}} onSubmit={onSubmit} />
+          <BukuForm
+            initial={{}}
+            onSubmit={async (v) => {
+              try {
+                await simpan({ data: v });
+                toast.success("Buku baru tersimpan.");
+                qc.invalidateQueries({ queryKey: ["buku-list"] });
+                onSelesai();
+              } catch (e) {
+                toast.error(e instanceof Error ? e.message : "Gagal.");
+              }
+            }}
+          />
         </TabsContent>
 
-        <TabsContent value="dari-ada" className="mt-3 space-y-3">
-          {!sumberBuku ? (
-            <div className="space-y-2">
-              <Label>Cari judul buku yang sudah ada</Label>
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  value={cari}
-                  onChange={(e) => { setCari(e.target.value); setShowSaran(true); }}
-                  onFocus={() => cari.length >= 2 && setShowSaran(true)}
-                  onBlur={() => setTimeout(() => setShowSaran(false), 200)}
-                  placeholder="Ketik judul buku…"
-                  className="pl-9"
-                />
-              </div>
-              {showSaran && cari.length >= 2 && (
-                <div className="max-h-60 overflow-auto rounded-md border">
-                  {saranBuku.isFetching && (
-                    <div className="flex items-center gap-2 p-3 text-sm text-muted-foreground">
-                      <Loader2 className="h-3 w-3 animate-spin" /> Mencari…
-                    </div>
-                  )}
-                  {saranBuku.data?.map((b) => (
-                    <button
-                      key={b.id}
-                      type="button"
-                      onMouseDown={(e) => e.preventDefault()}
-                      onClick={() => pilihBuku(b)}
-                      className="flex w-full flex-col gap-0.5 border-b p-3 text-left text-sm last:border-0 hover:bg-accent"
-                    >
-                      <span className="font-medium">{b.judul}</span>
-                      <span className="text-xs text-muted-foreground">
-                        {[b.pengarang, b.penerbit, b.tahun_terbit].filter(Boolean).join(" · ")}
-                      </span>
-                    </button>
-                  ))}
-                  {!saranBuku.isFetching && !saranBuku.data?.length && (
-                    <p className="p-3 text-sm text-muted-foreground">Tidak ada buku cocok.</p>
-                  )}
-                </div>
-              )}
-              <p className="text-xs text-muted-foreground">
-                Pilih buku dari daftar — semua data akan terisi otomatis. Tinggal ubah barcode untuk eksemplar baru.
-              </p>
-            </div>
-          ) : (
-            <div className="space-y-2">
-              <div className="flex items-center justify-between rounded-md border bg-muted/40 p-2 text-sm">
-                <span>
-                  <BookOpen className="mr-1 inline h-4 w-4 text-primary" />
-                  Berdasarkan: <span className="font-medium">{sumberBuku.judul}</span>
-                </span>
-                <Button size="sm" variant="ghost" onClick={() => setSumberBuku(null)}>
-                  <X className="mr-1 h-3 w-3" /> Ganti
-                </Button>
-              </div>
-              <BukuForm initial={sumberBuku} onSubmit={onSubmit} />
-            </div>
-          )}
+        <TabsContent value="dari-ada" className="mt-3">
+          <TambahEksemplarPanel onSelesai={onSelesai} />
         </TabsContent>
       </Tabs>
     </>
+  );
+}
+
+function TambahEksemplarPanel({ onSelesai }: { onSelesai: () => void }) {
+  const [sumber, setSumber] = useState<{ id: string; judul: string; count: number } | null>(null);
+  const [cari, setCari] = useState("");
+  const [showSaran, setShowSaran] = useState(false);
+  const [barcode, setBarcode] = useState("");
+  const [saving, setSaving] = useState(false);
+  const tambah = useServerFn(tambahEksemplarSatu);
+  const qc = useQueryClient();
+
+  const saranBuku = useQuery({
+    queryKey: ["saran-judul-eks", cari],
+    enabled: cari.length >= 2 && !sumber,
+    queryFn: async () => {
+      const s = cari.trim().replace(/[%,]/g, "");
+      const { data } = await supabase
+        .from("buku")
+        .select("id, judul, pengarang, penerbit, tahun_terbit, eksemplar(id)")
+        .ilike("judul", `%${s}%`)
+        .limit(8);
+      return data ?? [];
+    },
+  });
+
+  async function simpan(e: React.FormEvent) {
+    e.preventDefault();
+    if (!sumber) return;
+    const b = barcode.trim();
+    if (!b) return toast.error("Barcode wajib diisi.");
+    setSaving(true);
+    try {
+      await tambah({ data: { buku_id: sumber.id, barcode: b } });
+      toast.success(`Eksemplar baru ditambahkan ke "${sumber.judul}".`);
+      qc.invalidateQueries({ queryKey: ["buku-list"] });
+      onSelesai();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Gagal.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  if (!sumber) {
+    return (
+      <div className="space-y-2">
+        <Label>Cari judul buku yang sudah ada</Label>
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            value={cari}
+            onChange={(e) => { setCari(e.target.value); setShowSaran(true); }}
+            onFocus={() => cari.length >= 2 && setShowSaran(true)}
+            placeholder="Ketik judul buku…"
+            className="pl-9"
+          />
+        </div>
+        {showSaran && cari.length >= 2 && (
+          <div className="max-h-60 overflow-auto rounded-md border">
+            {saranBuku.isFetching && (
+              <div className="flex items-center gap-2 p-3 text-sm text-muted-foreground">
+                <Loader2 className="h-3 w-3 animate-spin" /> Mencari…
+              </div>
+            )}
+            {saranBuku.data?.map((b: any) => {
+              const jumlah = Array.isArray(b.eksemplar) ? b.eksemplar.length : 0;
+              return (
+                <button
+                  key={b.id}
+                  type="button"
+                  onClick={() => { setSumber({ id: b.id, judul: b.judul, count: jumlah }); setShowSaran(false); }}
+                  className="flex w-full items-center gap-2 border-b p-3 text-left text-sm last:border-0 hover:bg-accent"
+                >
+                  <div className="flex-1">
+                    <div className="font-medium">{b.judul}</div>
+                    <div className="text-xs text-muted-foreground">
+                      {[b.pengarang, b.penerbit, b.tahun_terbit].filter(Boolean).join(" · ")}
+                    </div>
+                  </div>
+                  <Badge variant="secondary" className="shrink-0">{jumlah} eksemplar</Badge>
+                </button>
+              );
+            })}
+            {!saranBuku.isFetching && !saranBuku.data?.length && (
+              <p className="p-3 text-sm text-muted-foreground">Tidak ada buku cocok.</p>
+            )}
+          </div>
+        )}
+        <p className="text-xs text-muted-foreground">
+          Pilih buku — tinggal input barcode baru untuk eksemplar tambahan (+1).
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <form onSubmit={simpan} className="space-y-3">
+      <div className="flex items-center justify-between rounded-md border bg-muted/40 p-3">
+        <div className="flex items-center gap-2">
+          <BookOpen className="h-4 w-4 text-primary" />
+          <div>
+            <div className="text-sm font-medium">{sumber.judul}</div>
+            <div className="text-xs text-muted-foreground">Sekarang {sumber.count} eksemplar</div>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <Badge className="bg-emerald-600 hover:bg-emerald-600">+1</Badge>
+          <Button size="sm" variant="ghost" type="button" onClick={() => { setSumber(null); setBarcode(""); }}>
+            <X className="mr-1 h-3 w-3" /> Ganti
+          </Button>
+        </div>
+      </div>
+      <div className="space-y-1">
+        <Label htmlFor="tek-barcode">Kode Barcot / Barcode eksemplar baru *</Label>
+        <Input
+          id="tek-barcode"
+          autoFocus
+          value={barcode}
+          onChange={(e) => setBarcode(e.target.value)}
+          placeholder="Scan / ketik barcode…"
+        />
+        <p className="text-xs text-muted-foreground">
+          Barcode wajib berbeda dari eksemplar lain — pakai barcode fisik pada buku baru.
+        </p>
+      </div>
+      <DialogFooter>
+        <Button type="submit" disabled={saving || !barcode.trim()}>
+          {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Tambah eksemplar
+        </Button>
+      </DialogFooter>
+    </form>
   );
 }
 
@@ -953,7 +1009,6 @@ function BukuForm({ initial, onSubmit }: { initial: any; onSubmit: (v: any) => P
       lokasi_rak: initial.lokasi_rak ?? "",
       deskripsi: initial.deskripsi ?? "",
       sampul_path: initial.sampul_path ?? "",
-      jumlah_eksemplar: "",
     };
     for (const k of META_FIELD_KEYS) base[k] = metaAwal[k] ?? "";
     if (!base.klasifikasi && initial.kategori) base.klasifikasi = initial.kategori;
@@ -982,8 +1037,6 @@ function BukuForm({ initial, onSubmit }: { initial: any; onSubmit: (v: any) => P
         deskripsi: v.deskripsi || null,
         sampul_path: v.sampul_path || null,
         meta: Object.keys(meta).length ? meta : undefined,
-        jumlah_eksemplar:
-          !initial.id && v.jumlah_eksemplar ? Number(v.jumlah_eksemplar) : undefined,
         kode_eksemplar_awal: !initial.id && v.kode_barcot?.trim() ? v.kode_barcot.trim() : undefined,
       });
     } finally {
@@ -1020,18 +1073,6 @@ function BukuForm({ initial, onSubmit }: { initial: any; onSubmit: (v: any) => P
           )}
         </div>
       ))}
-      {!initial.id && (
-        <div className="space-y-1">
-          <Label>Jumlah eksemplar (kode mengikuti Kode Barcot)</Label>
-          <Input
-            type="number"
-            min={0}
-            max={500}
-            value={v.jumlah_eksemplar}
-            onChange={(e) => setV({ ...v, jumlah_eksemplar: e.target.value })}
-          />
-        </div>
-      )}
       <DialogFooter className="sm:col-span-2">
         <Button type="submit" disabled={saving}>
           {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Simpan
@@ -1174,21 +1215,72 @@ function PrintLabels({ items, buku, onClose }: { items: any[]; buku: any; onClos
 // ============= TAB DATA MAHASISWA =============
 function TabMahasiswa() {
   const [search, setSearch] = useState("");
+  const [picked, setPicked] = useState<Set<string>>(new Set());
+  const [editMhs, setEditMhs] = useState<any>(null);
+  const qc = useQueryClient();
+  const hapusMhs = useServerFn(hapusMahasiswa);
+
   const list = useQuery({
     queryKey: ["mhs-list", search],
-    queryFn: async () => {
-      let q = supabase.from("profiles").select("id, nama, nim, prodi, email").order("nama");
+    queryFn: async (): Promise<any[]> => {
+      // Cast ke any: kolom tempat_lahir/tanggal_lahir/alamat/no_telp baru
+      // ditambahkan via migrasi; tipe Supabase yang di-generate belum memuatnya.
+      let q: any = (supabase.from("profiles") as any)
+        .select("id, nama, nim, prodi, email, tempat_lahir, tanggal_lahir, alamat, no_telp")
+        .order("nama");
       if (search) q = q.or(`nama.ilike.%${search}%,nim.ilike.%${search}%`);
       const { data, error } = await q.limit(200);
       if (error) throw error;
-      return data ?? [];
+      // Filter mahasiswa saja (skip yang tidak punya NIM — kemungkinan admin)
+      return (data ?? []).filter((r: any) => r.nim);
     },
   });
 
+  const semuaTerpilih =
+    !!list.data?.length && list.data.every((m) => picked.has(m.id));
+  function togglePickAll() {
+    if (semuaTerpilih) setPicked(new Set());
+    else setPicked(new Set((list.data ?? []).map((m) => m.id)));
+  }
+  function togglePick(id: string) {
+    const next = new Set(picked);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    setPicked(next);
+  }
+  async function hapusSatu(id: string, nama?: string | null) {
+    if (!confirm(`Hapus data mahasiswa ${nama ?? id}?`)) return;
+    try {
+      await hapusMhs({ data: { id } });
+      toast.success("Data mahasiswa dihapus.");
+      qc.invalidateQueries({ queryKey: ["mhs-list"] });
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Gagal.");
+    }
+  }
+  async function hapusBanyak() {
+    if (!picked.size) return;
+    if (!confirm(`Hapus ${picked.size} mahasiswa yang dipilih?`)) return;
+    let ok = 0,
+      gagal = 0;
+    for (const id of picked) {
+      try {
+        await hapusMhs({ data: { id } });
+        ok++;
+      } catch {
+        gagal++;
+      }
+    }
+    if (ok) toast.success(`${ok} mahasiswa dihapus.`);
+    if (gagal) toast.error(`${gagal} mahasiswa gagal dihapus (mungkin masih meminjam).`);
+    setPicked(new Set());
+    qc.invalidateQueries({ queryKey: ["mhs-list"] });
+  }
+
   return (
     <div className="space-y-4">
-      <div className="flex items-center gap-2">
-        <div className="relative flex-1">
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="relative flex-1 min-w-[240px]">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             placeholder="Cari nama / NIM…"
@@ -1198,28 +1290,60 @@ function TabMahasiswa() {
           />
         </div>
         <TambahMahasiswaDialog />
+        {picked.size > 0 && (
+          <Button size="sm" variant="destructive" onClick={hapusBanyak}>
+            <Trash2 className="mr-1 h-4 w-4" /> Hapus {picked.size} dipilih
+          </Button>
+        )}
       </div>
       <Card>
         <CardContent className="pt-6">
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead className="w-10">
+                  <Checkbox checked={semuaTerpilih} onCheckedChange={togglePickAll} />
+                </TableHead>
                 <TableHead>Nama</TableHead>
                 <TableHead>NIM</TableHead>
                 <TableHead>Prodi</TableHead>
+                <TableHead>No. Telp</TableHead>
+                <TableHead className="w-24 text-right">Aksi</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {list.data?.map((m) => (
-                <TableRow key={m.id}>
+                <TableRow key={m.id} data-state={picked.has(m.id) ? "selected" : undefined}>
+                  <TableCell>
+                    <Checkbox
+                      checked={picked.has(m.id)}
+                      onCheckedChange={() => togglePick(m.id)}
+                    />
+                  </TableCell>
                   <TableCell>{m.nama ?? "—"}</TableCell>
                   <TableCell className="font-mono text-xs">{m.nim ?? "—"}</TableCell>
                   <TableCell className="text-sm">{m.prodi ?? "—"}</TableCell>
+                  <TableCell className="text-sm">{(m as any).no_telp ?? "—"}</TableCell>
+                  <TableCell className="text-right">
+                    <div className="flex justify-end gap-1">
+                      <Button size="icon" variant="ghost" onClick={() => setEditMhs(m)}>
+                        <RefreshCw className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="text-destructive"
+                        onClick={() => hapusSatu(m.id, m.nama)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </TableCell>
                 </TableRow>
               ))}
               {!list.data?.length && (
                 <TableRow>
-                  <TableCell colSpan={3} className="text-center text-sm text-muted-foreground">
+                  <TableCell colSpan={6} className="text-center text-sm text-muted-foreground">
                     Tidak ada data mahasiswa.
                   </TableCell>
                 </TableRow>
@@ -1228,7 +1352,155 @@ function TabMahasiswa() {
           </Table>
         </CardContent>
       </Card>
+      {editMhs && (
+        <EditMahasiswaDialog
+          mhs={editMhs}
+          onClose={() => setEditMhs(null)}
+          onSaved={() => {
+            setEditMhs(null);
+            qc.invalidateQueries({ queryKey: ["mhs-list"] });
+          }}
+        />
+      )}
     </div>
+  );
+}
+
+function EditMahasiswaDialog({
+  mhs,
+  onClose,
+  onSaved,
+}: {
+  mhs: any;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const ubah = useServerFn(ubahMahasiswa);
+  const [nama, setNama] = useState(mhs.nama ?? "");
+  const [nim, setNim] = useState(mhs.nim ?? "");
+  const [prodi, setProdi] = useState(mhs.prodi ?? "");
+  const [tempatLahir, setTempatLahir] = useState(mhs.tempat_lahir ?? "");
+  const [tanggalLahir, setTanggalLahir] = useState<Date | undefined>(
+    mhs.tanggal_lahir ? new Date(mhs.tanggal_lahir) : undefined,
+  );
+  const [alamat, setAlamat] = useState(mhs.alamat ?? "");
+  const [noTelp, setNoTelp] = useState(mhs.no_telp ?? "");
+  const [busy, setBusy] = useState(false);
+
+  async function simpan(e: React.FormEvent) {
+    e.preventDefault();
+    if (nama.trim().length < 3) return toast.error("Nama minimal 3 karakter.");
+    if (!/^\d{6,15}$/.test(nim)) return toast.error("NIM harus 6–15 digit angka.");
+    if (!prodi) return toast.error("Pilih program studi.");
+    setBusy(true);
+    try {
+      await ubah({
+        data: {
+          id: mhs.id,
+          nama: nama.trim(),
+          nim,
+          prodi,
+          tempat_lahir: tempatLahir.trim() || null,
+          tanggal_lahir: tanggalLahir ? tanggalLahir.toISOString().slice(0, 10) : null,
+          alamat: alamat.trim() || null,
+          no_telp: noTelp.trim() || null,
+        },
+      });
+      toast.success("Data mahasiswa diperbarui.");
+      onSaved();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Gagal.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const PRODI = [
+    "Ilmu Pemerintahan",
+    "Ilmu Administrasi Publik",
+    "Ilmu Administrasi Bisnis",
+    "Ilmu Komunikasi",
+    "Sosiologi",
+    "Hubungan Internasional",
+  ];
+
+  return (
+    <Dialog open onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle>Ubah data mahasiswa</DialogTitle>
+        </DialogHeader>
+        <form onSubmit={simpan} className="grid max-h-[70vh] gap-3 overflow-y-auto pr-1 sm:grid-cols-2">
+          <div className="space-y-1 sm:col-span-2">
+            <Label className="text-xs">Nama lengkap *</Label>
+            <Input value={nama} onChange={(e) => setNama(e.target.value)} required />
+          </div>
+          <div className="space-y-1">
+            <Label className="text-xs">NIM *</Label>
+            <Input
+              inputMode="numeric"
+              value={nim}
+              onChange={(e) => setNim(e.target.value.replace(/\D/g, ""))}
+              required
+            />
+          </div>
+          <div className="space-y-1">
+            <Label className="text-xs">Program studi *</Label>
+            <select
+              value={prodi}
+              onChange={(e) => setProdi(e.target.value)}
+              className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm outline-none focus-visible:ring-1 focus-visible:ring-ring"
+              required
+            >
+              <option value="">-- Pilih program studi --</option>
+              {PRODI.map((p) => (
+                <option key={p} value={p}>{p}</option>
+              ))}
+            </select>
+          </div>
+          <div className="space-y-1">
+            <Label className="text-xs">Tempat lahir</Label>
+            <Input value={tempatLahir} onChange={(e) => setTempatLahir(e.target.value)} />
+          </div>
+          <div className="space-y-1">
+            <Label className="text-xs">Tanggal lahir</Label>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button type="button" variant="outline" className="w-full justify-start text-left font-normal">
+                  <CalendarIcon className="mr-2 h-4 w-4" />
+                  {tanggalLahir
+                    ? new Intl.DateTimeFormat("id-ID", { dateStyle: "long" }).format(tanggalLahir)
+                    : "Pilih tanggal"}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <CalendarComp
+                  mode="single"
+                  selected={tanggalLahir}
+                  onSelect={setTanggalLahir}
+                  captionLayout="dropdown"
+                  fromYear={1950}
+                  toYear={new Date().getFullYear()}
+                />
+              </PopoverContent>
+            </Popover>
+          </div>
+          <div className="space-y-1 sm:col-span-2">
+            <Label className="text-xs">Alamat</Label>
+            <Textarea value={alamat} onChange={(e) => setAlamat(e.target.value)} rows={2} />
+          </div>
+          <div className="space-y-1 sm:col-span-2">
+            <Label className="text-xs">No. Telepon</Label>
+            <Input inputMode="tel" value={noTelp} onChange={(e) => setNoTelp(e.target.value)} />
+          </div>
+          <DialogFooter className="sm:col-span-2">
+            <Button type="submit" disabled={busy}>
+              {busy && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Simpan
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
   );
 }
 

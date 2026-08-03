@@ -25,13 +25,14 @@ import { Loader2, Upload, History, RotateCcw, Plus, Download } from "lucide-reac
 import { toast } from "sonner";
 import { parseExcelFile, eksporBukuKeExcel, type SheetPreview } from "@/lib/excel-import";
 import { parseImagesTina } from "@/lib/excel-images";
-import { imporBukuMassal, kembalikanVersiBuku } from "@/lib/perpus.functions";
+import { imporBukuMassal, kembalikanVersiBuku, pastikanBucketSampul } from "@/lib/perpus.functions";
 import { fmtWITA } from "@/hooks/useMe";
 
 // Baris yang bisa diedit di grid pratinjau impor (kolom typed; `meta` menyimpan
 // kolom ekstra dari file agar tidak hilang saat diimpor).
 type EditRow = {
   kode_buku: string | null;
+  barcode_value: string | null;
   judul: string | null;
   pengarang: string | null;
   penerbit: string | null;
@@ -39,13 +40,13 @@ type EditRow = {
   isbn: string | null;
   kategori: string | null;
   lokasi_rak: string | null;
-  jumlah_eksemplar: number | null;
   meta?: Record<string, string>;
 };
 
 function barisBaru(): EditRow {
   return {
     kode_buku: "",
+    barcode_value: null,
     judul: "",
     pengarang: null,
     penerbit: null,
@@ -53,7 +54,6 @@ function barisBaru(): EditRow {
     isbn: null,
     kategori: null,
     lokasi_rak: null,
-    jumlah_eksemplar: 1,
   };
 }
 
@@ -83,9 +83,9 @@ const imporColumns: Column<EditRow>[] = [
     minWidth: 120,
   },
   {
-    ...keyColumn<EditRow, "jumlah_eksemplar">("jumlah_eksemplar", intColumn),
-    title: "Jml eks",
-    minWidth: 80,
+    ...keyColumn<EditRow, "barcode_value">("barcode_value", textColumn),
+    title: "Kode Barcot",
+    minWidth: 130,
   },
 ];
 
@@ -118,6 +118,7 @@ export function ImportBukuButton() {
   // Foto tertanam dari file .xlsx dipetakan ke kode_buku (kolom unik).
   const [imagesByKode, setImagesByKode] = useState<Map<string, Blob>>(new Map());
   const impor = useServerFn(imporBukuMassal);
+  const pastikanBucket = useServerFn(pastikanBucketSampul);
   const qc = useQueryClient();
 
   async function onFile(file: File) {
@@ -197,6 +198,7 @@ export function ImportBukuButton() {
     setEditRows(
       active.rows.map((r) => ({
         kode_buku: r.kode_buku ?? null,
+        barcode_value: r.barcode_value ?? null,
         judul: r.judul ?? null,
         pengarang: r.pengarang ?? null,
         penerbit: r.penerbit ?? null,
@@ -204,7 +206,6 @@ export function ImportBukuButton() {
         isbn: r.isbn ?? null,
         kategori: r.kategori ?? null,
         lokasi_rak: r.lokasi_rak ?? null,
-        jumlah_eksemplar: r.jumlah_eksemplar ?? 1,
         meta: r.meta,
       })),
     );
@@ -219,6 +220,7 @@ export function ImportBukuButton() {
         .filter((r) => r.kode_buku && r.judul)
         .map((r) => ({
           kode_buku: r.kode_buku as string,
+          barcode_value: r.barcode_value,
           judul: r.judul as string,
           pengarang: r.pengarang,
           penerbit: r.penerbit,
@@ -226,12 +228,18 @@ export function ImportBukuButton() {
           isbn: r.isbn,
           kategori: r.kategori,
           lokasi_rak: r.lokasi_rak,
-          jumlah_eksemplar: r.jumlah_eksemplar ?? 1,
           meta: r.meta,
         }));
 
       const kodes = rowsBase.map((r) => r.kode_buku);
       if (imagesByKode.size > 0) {
+        // Pastikan bucket 'sampul' ada (dibuat otomatis bila belum) sebelum unggah.
+        setProgress("Menyiapkan penyimpanan foto…");
+        try {
+          await pastikanBucket({});
+        } catch {
+          /* Bila gagal (mis. bucket sudah ada), lanjutkan saja. */
+        }
         setProgress(`Mengunggah ${imagesByKode.size} foto…`);
       }
       const paths = await uploadImages(kodes);
@@ -241,11 +249,12 @@ export function ImportBukuButton() {
         updated = 0,
         skipped = 0,
         eks = 0;
-      const totalBatches = Math.ceil(rowsClean.length / 500);
-      for (let i = 0; i < rowsClean.length; i += 500) {
-        const batchNum = Math.floor(i / 500) + 1;
+      const BATCH = 250;
+      const totalBatches = Math.ceil(rowsClean.length / BATCH);
+      for (let i = 0; i < rowsClean.length; i += BATCH) {
+        const batchNum = Math.floor(i / BATCH) + 1;
         setProgress(`Mengimpor batch ${batchNum}/${totalBatches} (${i}/${rowsClean.length} baris)…`);
-        const chunk = rowsClean.slice(i, i + 500);
+        const chunk = rowsClean.slice(i, i + BATCH);
         const r = await impor({ data: { mode, rows: chunk } });
         inserted += r.inserted;
         updated += r.updated;
