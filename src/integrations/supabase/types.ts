@@ -293,33 +293,45 @@ export type Database = {
       }
       profiles: {
         Row: {
+          alamat: string | null
           created_at: string
           email: string | null
           id: string
           is_profile_completed: boolean
           nama: string | null
           nim: string | null
+          no_telp: string | null
           prodi: string | null
+          tanggal_lahir: string | null
+          tempat_lahir: string | null
           updated_at: string
         }
         Insert: {
+          alamat?: string | null
           created_at?: string
           email?: string | null
           id: string
           is_profile_completed?: boolean
           nama?: string | null
           nim?: string | null
+          no_telp?: string | null
           prodi?: string | null
+          tanggal_lahir?: string | null
+          tempat_lahir?: string | null
           updated_at?: string
         }
         Update: {
+          alamat?: string | null
           created_at?: string
           email?: string | null
           id?: string
           is_profile_completed?: boolean
           nama?: string | null
           nim?: string | null
+          no_telp?: string | null
           prodi?: string | null
+          tanggal_lahir?: string | null
+          tempat_lahir?: string | null
           updated_at?: string
         }
         Relationships: []
