@@ -135,6 +135,14 @@ function TabTransaksi() {
       .on("postgres_changes", { event: "*", schema: "public", table: "eksemplar" }, () => {
         invalidateDebounced("buku-list");
       })
+      // Perubahan buku (tambah/edit/hapus) dari device lain → daftar ikut segar.
+      .on("postgres_changes", { event: "*", schema: "public", table: "buku" }, () => {
+        invalidateDebounced("buku-list");
+      })
+      // Perubahan data mahasiswa (tambah/edit/hapus) dari device lain.
+      .on("postgres_changes", { event: "*", schema: "public", table: "profiles" }, () => {
+        invalidateDebounced("mhs-list");
+      })
       .on("postgres_changes", { event: "*", schema: "public", table: "denda" }, (payload) => {
         invalidateDebounced("denda-list");
         if (payload.eventType === "INSERT") toastRedam(() => toast.warning("Denda baru terdeteksi."));
