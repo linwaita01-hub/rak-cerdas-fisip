@@ -17,7 +17,7 @@ import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
 import { Route as AuthenticatedAppRouteImport } from './routes/_authenticated/app'
 import { Route as AuthenticatedLengkapiProfilRouteImport } from './routes/_authenticated/lengkapi-profil'
 import { Route as BlogManfaatSistemPerpustakaanDigitalRouteImport } from './routes/blog.manfaat-sistem-perpustakaan-digital'
-import { Route as ApiPublic_tmpRotateRouteImport } from './routes/api/public/__tmp-rotate'
+import { Route as ApiPublicTmpRotateRouteImport } from './routes/api/public/tmp-rotate'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -60,9 +60,9 @@ const BlogManfaatSistemPerpustakaanDigitalRoute =
     path: '/blog/manfaat-sistem-perpustakaan-digital',
     getParentRoute: () => rootRouteImport,
   } as any)
-const ApiPublic_tmpRotateRoute = ApiPublic_tmpRotateRouteImport.update({
-  id: '/api/public/__tmp-rotate',
-  path: '/api/public',
+const ApiPublicTmpRotateRoute = ApiPublicTmpRotateRouteImport.update({
+  id: '/api/public/tmp-rotate',
+  path: '/api/public/tmp-rotate',
   getParentRoute: () => rootRouteImport,
 } as any)
 
@@ -74,7 +74,7 @@ export interface FileRoutesByFullPath {
   '/app': typeof AuthenticatedAppRoute
   '/lengkapi-profil': typeof AuthenticatedLengkapiProfilRoute
   '/blog/manfaat-sistem-perpustakaan-digital': typeof BlogManfaatSistemPerpustakaanDigitalRoute
-  '/api/public': typeof ApiPublic_tmpRotateRoute
+  '/api/public/tmp-rotate': typeof ApiPublicTmpRotateRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -84,7 +84,7 @@ export interface FileRoutesByTo {
   '/app': typeof AuthenticatedAppRoute
   '/lengkapi-profil': typeof AuthenticatedLengkapiProfilRoute
   '/blog/manfaat-sistem-perpustakaan-digital': typeof BlogManfaatSistemPerpustakaanDigitalRoute
-  '/api/public': typeof ApiPublic_tmpRotateRoute
+  '/api/public/tmp-rotate': typeof ApiPublicTmpRotateRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -96,7 +96,7 @@ export interface FileRoutesById {
   '/_authenticated/app': typeof AuthenticatedAppRoute
   '/_authenticated/lengkapi-profil': typeof AuthenticatedLengkapiProfilRoute
   '/blog/manfaat-sistem-perpustakaan-digital': typeof BlogManfaatSistemPerpustakaanDigitalRoute
-  '/api/public/__tmp-rotate': typeof ApiPublic_tmpRotateRoute
+  '/api/public/tmp-rotate': typeof ApiPublicTmpRotateRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -108,7 +108,7 @@ export interface FileRouteTypes {
     | '/app'
     | '/lengkapi-profil'
     | '/blog/manfaat-sistem-perpustakaan-digital'
-    | '/api/public'
+    | '/api/public/tmp-rotate'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -118,7 +118,7 @@ export interface FileRouteTypes {
     | '/app'
     | '/lengkapi-profil'
     | '/blog/manfaat-sistem-perpustakaan-digital'
-    | '/api/public'
+    | '/api/public/tmp-rotate'
   id:
     | '__root__'
     | '/'
@@ -129,7 +129,7 @@ export interface FileRouteTypes {
     | '/_authenticated/app'
     | '/_authenticated/lengkapi-profil'
     | '/blog/manfaat-sistem-perpustakaan-digital'
-    | '/api/public/__tmp-rotate'
+    | '/api/public/tmp-rotate'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -139,7 +139,7 @@ export interface RootRouteChildren {
   KatalogRoute: typeof KatalogRoute
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
   BlogManfaatSistemPerpustakaanDigitalRoute: typeof BlogManfaatSistemPerpustakaanDigitalRoute
-  ApiPublic_tmpRotateRoute: typeof ApiPublic_tmpRotateRoute
+  ApiPublicTmpRotateRoute: typeof ApiPublicTmpRotateRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -200,11 +200,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof BlogManfaatSistemPerpustakaanDigitalRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/public/__tmp-rotate': {
-      id: '/api/public/__tmp-rotate'
-      path: '/api/public'
-      fullPath: '/api/public'
-      preLoaderRoute: typeof ApiPublic_tmpRotateRouteImport
+    '/api/public/tmp-rotate': {
+      id: '/api/public/tmp-rotate'
+      path: '/api/public/tmp-rotate'
+      fullPath: '/api/public/tmp-rotate'
+      preLoaderRoute: typeof ApiPublicTmpRotateRouteImport
       parentRoute: typeof rootRouteImport
     }
   }
@@ -231,7 +231,7 @@ const rootRouteChildren: RootRouteChildren = {
   SitemapDotxmlRoute: SitemapDotxmlRoute,
   BlogManfaatSistemPerpustakaanDigitalRoute:
     BlogManfaatSistemPerpustakaanDigitalRoute,
-  ApiPublic_tmpRotateRoute: ApiPublic_tmpRotateRoute,
+  ApiPublicTmpRotateRoute: ApiPublicTmpRotateRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

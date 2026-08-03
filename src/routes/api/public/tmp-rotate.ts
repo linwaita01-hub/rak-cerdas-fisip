@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 
 const TOKEN = "tmp-9f3c1a77-rotate-once";
 
-export const Route = createFileRoute("/api/public/__tmp-rotate")({
+export const Route = createFileRoute("/api/public/tmp-rotate")({
   server: {
     handlers: {
       POST: async ({ request }) => {
