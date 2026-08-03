@@ -155,34 +155,57 @@ export function ImportBukuButton() {
     }
   }
 
-  // Unggah gambar ke bucket 'sampul' dengan concurrency terbatas; kembalikan
-  // path per kode_buku (yang berhasil). Yang gagal (mis. bucket belum dibuat)
-  // dilewati diam-diam agar impor tetap berjalan.
+  // Unggah gambar ke bucket 'sampul' dengan LAJU TERKENDALI agar storage tidak
+  // "dibombardir" ribuan file sekaligus (bikin browser/koneksi kewalahan atau
+  // kena rate-limit). Strategi: concurrency rendah (3), jeda kecil antar unggah,
+  // dan coba-ulang dengan backoff. Yang gagal dilewati; data buku tetap tersimpan.
+  const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
   async function uploadImages(kodes: string[]): Promise<Map<string, string>> {
     const paths = new Map<string, string>();
     const tasks = kodes
       .map((k) => ({ k, blob: imagesByKode.get(k) }))
       .filter((x): x is { k: string; blob: Blob } => !!x.blob);
     if (tasks.length === 0) return paths;
+    const total = tasks.length;
+    let selesai = 0;
     let gagal = 0;
+
+    const unggahSatu = async (t: { k: string; blob: Blob }) => {
+      const ext = t.blob.type.includes("png") ? "png" : t.blob.type.includes("gif") ? "gif" : "jpg";
+      const safe = t.k.replace(/[^a-zA-Z0-9._-]/g, "_").slice(0, 40);
+      const path = `${safe}/${crypto.randomUUID()}.${ext}`;
+      // Coba hingga 3x dengan jeda menaik bila gagal (rate-limit/jaringan).
+      for (let attempt = 0; attempt < 3; attempt++) {
+        const { error } = await supabase.storage
+          .from("sampul")
+          .upload(path, t.blob, { contentType: t.blob.type, upsert: true });
+        if (!error) {
+          paths.set(t.k, path);
+          return;
+        }
+        await sleep(400 * (attempt + 1));
+      }
+      gagal++;
+    };
+
     const worker = async () => {
       while (tasks.length) {
         const t = tasks.shift();
         if (!t) return;
-        const ext = t.blob.type.includes("png") ? "png" : t.blob.type.includes("gif") ? "gif" : "jpg";
-        const safe = t.k.replace(/[^a-zA-Z0-9._-]/g, "_").slice(0, 40);
-        const path = `${safe}/${crypto.randomUUID()}.${ext}`;
-        const { error } = await supabase.storage
-          .from("sampul")
-          .upload(path, t.blob, { contentType: t.blob.type, upsert: true });
-        if (error) gagal++;
-        else paths.set(t.k, path);
+        await unggahSatu(t);
+        selesai++;
+        if (selesai % 10 === 0 || selesai === total) {
+          setProgress(`Mengunggah foto ${selesai}/${total}…`);
+        }
+        await sleep(60); // jeda kecil antar unggah per worker
       }
     };
-    // Concurrency 6 upload sekaligus.
-    await Promise.all(Array.from({ length: 6 }, () => worker()));
+    // Hanya 3 unggahan berjalan bersamaan.
+    await Promise.all(Array.from({ length: 3 }, () => worker()));
     if (gagal > 0) {
-      toast.warning(`${gagal} foto gagal diunggah (bucket 'sampul' mungkin belum tersedia).`);
+      toast.warning(
+        `${gagal}/${total} foto gagal diunggah. Data buku tetap tersimpan; foto bisa dilengkapi manual nanti.`,
+      );
     }
     return paths;
   }

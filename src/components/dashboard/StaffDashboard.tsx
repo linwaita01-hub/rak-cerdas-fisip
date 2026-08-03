@@ -105,26 +105,45 @@ function TabTransaksi() {
   const bebaskan = useServerFn(bebaskanDenda);
   const sweep = useServerFn(jalankanSweepTerlambat);
 
-  // Realtime refresh + notifikasi in-app
+  // Realtime refresh + notifikasi in-app.
+  // Invalidasi di-debounce: saat impor massal, ribuan event eksemplar/buku
+  // bisa datang beruntun — tanpa debounce ini memicu ribuan refetch (UI ngadat).
+  // Notifikasi toast juga diredam agar tidak muncul ratusan kali sekaligus.
   useEffect(() => {
+    const timers: Record<string, ReturnType<typeof setTimeout> | undefined> = {};
+    const invalidateDebounced = (key: string) => {
+      if (timers[key]) return;
+      timers[key] = setTimeout(() => {
+        timers[key] = undefined;
+        qc.invalidateQueries({ queryKey: [key] });
+      }, 800);
+    };
+    let lastToast = 0;
+    const toastRedam = (fn: () => void) => {
+      const now = performance.now();
+      if (now - lastToast < 3000) return; // maksimal 1 toast / 3 detik
+      lastToast = now;
+      fn();
+    };
     const ch = supabase
       .channel("staff-transaksi")
       .on("postgres_changes", { event: "*", schema: "public", table: "peminjaman" }, (payload) => {
-        qc.invalidateQueries({ queryKey: ["pinjaman-aktif"] });
-        if (payload.eventType === "INSERT") toast.info("Peminjaman baru tercatat.");
+        invalidateDebounced("pinjaman-aktif");
+        if (payload.eventType === "INSERT") toastRedam(() => toast.info("Peminjaman baru tercatat."));
         if (payload.eventType === "UPDATE" && payload.new?.status === "dikembalikan")
-          toast.info("Buku dikembalikan.");
+          toastRedam(() => toast.info("Buku dikembalikan."));
       })
       .on("postgres_changes", { event: "*", schema: "public", table: "eksemplar" }, () => {
-        qc.invalidateQueries({ queryKey: ["buku-list"] });
+        invalidateDebounced("buku-list");
       })
       .on("postgres_changes", { event: "*", schema: "public", table: "denda" }, (payload) => {
-        qc.invalidateQueries({ queryKey: ["denda-list"] });
-        if (payload.eventType === "INSERT") toast.warning("Denda baru terdeteksi.");
+        invalidateDebounced("denda-list");
+        if (payload.eventType === "INSERT") toastRedam(() => toast.warning("Denda baru terdeteksi."));
       })
       .subscribe();
     return () => {
       supabase.removeChannel(ch);
+      for (const t of Object.values(timers)) if (t) clearTimeout(t);
     };
   }, [qc]);
 
