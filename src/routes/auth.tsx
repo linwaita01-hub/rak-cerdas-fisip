@@ -94,15 +94,27 @@ function LoginForm() {
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    // Login bisa gagal karena jaringan/service worker basi ("Failed to fetch").
+    // Coba ulang sekali sebelum menampilkan pesan agar tidak mengganggu petugas.
+    let error = (await supabase.auth.signInWithPassword({ email, password })).error;
+    if (error && /failed to fetch|network|load failed/i.test(error.message)) {
+      await new Promise((r) => setTimeout(r, 800));
+      error = (await supabase.auth.signInWithPassword({ email, password })).error;
+    }
     setLoading(false);
     if (error) {
-      toast.error(error.message === "Invalid login credentials" ? "Email atau sandi salah." : error.message);
+      const pesan = /failed to fetch|network|load failed/i.test(error.message)
+        ? "Gagal menghubungi server. Periksa koneksi internet lalu muat ulang halaman (Ctrl+Shift+R)."
+        : error.message === "Invalid login credentials"
+          ? "Email atau sandi salah."
+          : error.message;
+      toast.error(pesan);
       return;
     }
     toast.success("Berhasil masuk.");
     navigate({ to: "/app" });
   }
+
 
   return (
     <form onSubmit={onSubmit} className="mt-4 space-y-4">
