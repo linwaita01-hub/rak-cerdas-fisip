@@ -176,6 +176,21 @@ function toInt(v: unknown): number | null {
   const n = Number(String(v).replace(/[^\d-]/g, ""));
   return Number.isFinite(n) ? n : null;
 }
+// Kolom "Tanggal" di file Tina tersimpan sebagai angka serial Excel (mis.
+// 45579). Konversi ke tanggal terbaca dd/mm/yyyy. Bila bukan serial wajar
+// (di luar ~1954–2064), kembalikan apa adanya sebagai teks.
+function toTanggal(v: unknown): string | null {
+  const s = toStr(v);
+  if (s == null) return null;
+  const n = typeof v === "number" ? v : Number(s);
+  if (!Number.isFinite(n) || n < 20000 || n > 60000) return s;
+  // Serial Excel: 25569 = 1970-01-01 (sudah memperhitungkan bug tahun 1900).
+  const d = new Date(Math.round((n - 25569) * 86400 * 1000));
+  if (isNaN(d.getTime())) return s;
+  const dd = String(d.getUTCDate()).padStart(2, "0");
+  const mm = String(d.getUTCMonth() + 1).padStart(2, "0");
+  return `${dd}/${mm}/${d.getUTCFullYear()}`;
+}
 
 export type SheetPreview = {
   sheetName: string;
@@ -264,10 +279,11 @@ export async function parseExcelFile(file: File): Promise<{ sheets: SheetPreview
       const maxCols = Math.max(effectiveHeader.length, r.length);
       for (let j = 0; j < maxCols; j++) {
         if (usedIdx.has(j)) continue;
-        const val = toStr(r[j]);
-        if (val == null) continue;
         const key = metaKey(effectiveHeader[j] ?? "") ?? `kolom_${j + 1}`;
         if (key === "catatan") continue;
+        // Tanggal: konversi serial Excel → dd/mm/yyyy; lainnya apa adanya.
+        const val = key === "tanggal" ? toTanggal(r[j]) : toStr(r[j]);
+        if (val == null) continue;
         if (!(key in meta)) meta[key] = val;
       }
       // No. Inventaris & Kode Barcot disimpan ke meta agar form Ubah buku
