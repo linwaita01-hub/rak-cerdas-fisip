@@ -535,8 +535,6 @@ function PinjamMejaCard() {
               inputMode="numeric"
               value={durasiText}
               onChange={(e) => setDurasiText(e.target.value.replace(/\D/g, ""))}
-              onBlur={() => setDurasiText(String(durasi))}
-              placeholder="7"
             />
           </div>
           <Button className="flex-1" disabled={busy || !barcode || !terpilih} onClick={kirim}>
