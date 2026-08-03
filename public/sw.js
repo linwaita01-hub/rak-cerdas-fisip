@@ -7,7 +7,7 @@
  *  - Katalog (Supabase REST GET): stale-while-revalidate (bisa dibuka offline)
  *  - Aksi tulis (POST/PATCH/DELETE, RPC, auth, realtime): selalu online (tidak di-cache)
  */
-const VERSION = "v1";
+const VERSION = "v2";
 const SHELL = `perpus-shell-${VERSION}`;
 const STATIC = `perpus-static-${VERSION}`;
 const DATA = `perpus-data-${VERSION}`;
