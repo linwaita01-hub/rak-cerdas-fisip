@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { DataSheetGrid, keyColumn, textColumn, intColumn, type Column } from "react-datasheet-grid";
+import { DataSheetGrid, keyColumn, textColumn, type Column } from "react-datasheet-grid";
 import "react-datasheet-grid/dist/style.css";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -36,7 +36,9 @@ type EditRow = {
   judul: string | null;
   pengarang: string | null;
   penerbit: string | null;
-  tahun_terbit: number | null;
+  // Tahun disimpan sebagai teks di grid agar tidak ditampilkan dengan pemisah
+  // ribuan (mis. "2.016"). Dikonversi ke angka saat impor.
+  tahun_terbit: string | null;
   isbn: string | null;
   kategori: string | null;
   lokasi_rak: string | null;
@@ -71,7 +73,7 @@ const imporColumns: Column<EditRow>[] = [
   },
   { ...keyColumn<EditRow, "penerbit">("penerbit", textColumn), title: "Penerbit", minWidth: 140 },
   {
-    ...keyColumn<EditRow, "tahun_terbit">("tahun_terbit", intColumn),
+    ...keyColumn<EditRow, "tahun_terbit">("tahun_terbit", textColumn),
     title: "Tahun",
     minWidth: 80,
   },
@@ -225,7 +227,7 @@ export function ImportBukuButton() {
         judul: r.judul ?? null,
         pengarang: r.pengarang ?? null,
         penerbit: r.penerbit ?? null,
-        tahun_terbit: r.tahun_terbit ?? null,
+        tahun_terbit: r.tahun_terbit != null ? String(r.tahun_terbit) : null,
         isbn: r.isbn ?? null,
         kategori: r.kategori ?? null,
         lokasi_rak: r.lokasi_rak ?? null,
@@ -247,7 +249,7 @@ export function ImportBukuButton() {
           judul: r.judul as string,
           pengarang: r.pengarang,
           penerbit: r.penerbit,
-          tahun_terbit: r.tahun_terbit,
+          tahun_terbit: r.tahun_terbit ? Number(String(r.tahun_terbit).replace(/\D/g, "")) || null : null,
           isbn: r.isbn,
           kategori: r.kategori,
           lokasi_rak: r.lokasi_rak,
