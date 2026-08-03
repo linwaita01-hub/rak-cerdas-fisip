@@ -39,9 +39,22 @@ export function PwaManager() {
         });
     };
 
+    let reloading = false;
+    const onControllerChange = () => {
+      if (reloading) return;
+      reloading = true;
+      window.location.reload();
+    };
+    navigator.serviceWorker.addEventListener("controllerchange", onControllerChange);
+
     if (document.readyState === "complete") register();
     else window.addEventListener("load", register, { once: true });
+
+    return () => {
+      navigator.serviceWorker.removeEventListener("controllerchange", onControllerChange);
+    };
   }, []);
+
 
   useEffect(() => {
     const onPrompt = (e: Event) => {
