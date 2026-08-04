@@ -1258,7 +1258,7 @@ function EditMahasiswaDialog({
   const ubah = useServerFn(ubahMahasiswa);
   const [nama, setNama] = useState(mhs.nama ?? "");
   const [nim, setNim] = useState(mhs.nim ?? "");
-  const [prodi, setProdi] = useState(mhs.prodi ?? "");
+  const [prodi, setProdi] = useState(mhs.prodi ?? "Ilmu Pemerintahan");
   const [tempatLahir, setTempatLahir] = useState(mhs.tempat_lahir ?? "");
   const [tanggalLahir, setTanggalLahir] = useState<Date | undefined>(
     mhs.tanggal_lahir ? new Date(mhs.tanggal_lahir) : undefined,
