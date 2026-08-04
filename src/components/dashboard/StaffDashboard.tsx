@@ -1301,7 +1301,8 @@ function EditMahasiswaDialog({
     "Ilmu Administrasi Bisnis",
     "Ilmu Komunikasi",
     "Sosiologi",
-    "Hubungan Internasional",
+    "Antropologi",
+    "Geografi",
   ];
 
   return (
