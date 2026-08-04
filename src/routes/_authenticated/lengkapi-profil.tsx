@@ -40,7 +40,7 @@ function LengkapiProfil() {
       if (data) {
         setNama(data.nama ?? "");
         setNim(data.nim ?? "");
-        setProdi(data.prodi ?? "");
+        setProdi(data.prodi ?? "Ilmu Pemerintahan");
       }
       setLoading(false);
     })();
