@@ -28,7 +28,7 @@ function LengkapiProfil() {
   const navigate = useNavigate();
   const [nama, setNama] = useState("");
   const [nim, setNim] = useState("");
-  const [prodi, setProdi] = useState("");
+  const [prodi, setProdi] = useState("Ilmu Pemerintahan");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
