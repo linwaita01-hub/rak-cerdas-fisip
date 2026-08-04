@@ -20,14 +20,15 @@ const PRODI = [
   "Ilmu Administrasi Bisnis",
   "Ilmu Komunikasi",
   "Sosiologi",
-  "Hubungan Internasional",
+  "Antropologi",
+  "Geografi",
 ];
 
 function LengkapiProfil() {
   const navigate = useNavigate();
   const [nama, setNama] = useState("");
   const [nim, setNim] = useState("");
-  const [prodi, setProdi] = useState("");
+  const [prodi, setProdi] = useState("Ilmu Pemerintahan");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -39,7 +40,7 @@ function LengkapiProfil() {
       if (data) {
         setNama(data.nama ?? "");
         setNim(data.nim ?? "");
-        setProdi(data.prodi ?? "");
+        setProdi(data.prodi ?? "Ilmu Pemerintahan");
       }
       setLoading(false);
     })();
@@ -94,7 +95,7 @@ function LengkapiProfil() {
                   className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm outline-none focus-visible:ring-1 focus-visible:ring-ring"
                   required
                 >
-                  <option value="">-- Pilih program studi --</option>
+                  
                   {PRODI.map((p) => <option key={p} value={p}>{p}</option>)}
                 </select>
               </div>

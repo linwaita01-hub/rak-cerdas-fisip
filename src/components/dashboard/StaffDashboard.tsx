@@ -1258,7 +1258,7 @@ function EditMahasiswaDialog({
   const ubah = useServerFn(ubahMahasiswa);
   const [nama, setNama] = useState(mhs.nama ?? "");
   const [nim, setNim] = useState(mhs.nim ?? "");
-  const [prodi, setProdi] = useState(mhs.prodi ?? "");
+  const [prodi, setProdi] = useState(mhs.prodi ?? "Ilmu Pemerintahan");
   const [tempatLahir, setTempatLahir] = useState(mhs.tempat_lahir ?? "");
   const [tanggalLahir, setTanggalLahir] = useState<Date | undefined>(
     mhs.tanggal_lahir ? new Date(mhs.tanggal_lahir) : undefined,
@@ -1301,7 +1301,8 @@ function EditMahasiswaDialog({
     "Ilmu Administrasi Bisnis",
     "Ilmu Komunikasi",
     "Sosiologi",
-    "Hubungan Internasional",
+    "Antropologi",
+    "Geografi",
   ];
 
   return (
@@ -1332,7 +1333,6 @@ function EditMahasiswaDialog({
               className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm outline-none focus-visible:ring-1 focus-visible:ring-ring"
               required
             >
-              <option value="">-- Pilih program studi --</option>
               {PRODI.map((p) => (
                 <option key={p} value={p}>{p}</option>
               ))}

@@ -27,7 +27,8 @@ const PRODI = [
   "Ilmu Administrasi Bisnis",
   "Ilmu Komunikasi",
   "Sosiologi",
-  "Hubungan Internasional",
+  "Antropologi",
+  "Geografi",
 ];
 
 export type MahasiswaBaru = {
@@ -53,7 +54,7 @@ export function TambahMahasiswaDialog({
   const [open, setOpen] = useState(false);
   const [nama, setNama] = useState("");
   const [nim, setNim] = useState("");
-  const [prodi, setProdi] = useState("");
+  const [prodi, setProdi] = useState("Ilmu Pemerintahan");
   const [tempatLahir, setTempatLahir] = useState("");
   const [tanggalLahir, setTanggalLahir] = useState<Date | undefined>();
   const [alamat, setAlamat] = useState("");
@@ -134,7 +135,7 @@ export function TambahMahasiswaDialog({
               className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm outline-none focus-visible:ring-1 focus-visible:ring-ring"
               required
             >
-              <option value="">-- Pilih program studi --</option>
+              
               {PRODI.map((p) => (
                 <option key={p} value={p}>{p}</option>
               ))}
